@@ -6,6 +6,7 @@ import path from "path";
 import QRCode from "qrcode";
 import { WhatsAppBot } from "./bot/whatsapp";
 import { setNotificationSender } from "./agent/tools";
+import { prisma } from "./services/db";
 
 // Load Environment Variables
 dotenv.config();
@@ -89,23 +90,205 @@ http.createServer(async (_req, res) => {
   // Check if WhatsApp is already authenticated and active
   const qr = (global as any).__latestQR as string | undefined;
   if (!qr) {
+    let totalUsers = 0;
+    let onboardedUsers = 0;
+    let recentUsersList: Array<{ chatId: string; username: string | null; createdAt: Date }> = [];
+    
+    try {
+      totalUsers = await prisma.user.count();
+      onboardedUsers = await prisma.user.count({ where: { onboarded: true } });
+      recentUsersList = await prisma.user.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        select: { chatId: true, username: true, createdAt: true }
+      });
+    } catch (dbErr) {
+      console.error("Failed to query DB stats for dashboard:", dbErr);
+    }
+
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <html>
         <head>
-          <title>✅ Bot Connected</title>
+          <title>📊 Stellapp Admin Dashboard</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { background: #0f172a; color: #f8fafc; font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .card { background: #1e293b; padding: 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #334155; }
-            h2 { color: #10b981; margin-top: 0; }
-            p { color: #94a3b8; }
+            body { 
+              background: #0f172a; 
+              color: #f8fafc; 
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+              margin: 0; 
+              padding: 40px 20px; 
+              display: flex; 
+              justify-content: center; 
+            }
+            .container { max-width: 900px; width: 100%; }
+            header { 
+              display: flex; 
+              justify-content: space-between; 
+              align-items: center; 
+              margin-bottom: 40px; 
+              border-bottom: 1px solid #334155; 
+              padding-bottom: 20px; 
+            }
+            h1 { margin: 0; color: #38bdf8; font-size: 28px; }
+            .status-badge { 
+              background: rgba(16, 185, 129, 0.1); 
+              color: #10b981; 
+              border: 1px solid rgba(16, 185, 129, 0.2); 
+              padding: 6px 16px; 
+              border-radius: 9999px; 
+              font-size: 14px; 
+              font-weight: 600; 
+              display: flex; 
+              align-items: center; 
+              gap: 8px; 
+            }
+            .status-dot { 
+              width: 8px; 
+              height: 8px; 
+              background: #10b981; 
+              border-radius: 50%; 
+              box-shadow: 0 0 8px #10b981; 
+            }
+            .grid { 
+              display: grid; 
+              grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
+              gap: 25px; 
+              margin-bottom: 40px; 
+            }
+            .card { 
+              background: #1e293b; 
+              border-radius: 16px; 
+              padding: 24px; 
+              border: 1px solid #334155; 
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+            }
+            .card h3 { margin: 0 0 10px 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .card .value { font-size: 32px; font-weight: bold; color: #f8fafc; }
+            .card .sub { color: #64748b; font-size: 12px; margin-top: 5px; }
+            
+            .section-title { font-size: 18px; color: #e2e8f0; margin: 0 0 20px 0; border-bottom: 2px solid #334155; padding-bottom: 8px; }
+            .details-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            .details-table td { padding: 12px 16px; border-bottom: 1px solid #1e293b; font-size: 14px; }
+            .details-table tr:last-child td { border-bottom: none; }
+            .details-table td.label { color: #94a3b8; width: 40%; font-weight: 500; }
+            .details-table td.val { font-family: monospace; color: #38bdf8; word-break: break-all; }
+            
+            .users-list { display: flex; flex-direction: column; gap: 12px; }
+            .user-item { 
+              display: flex; 
+              justify-content: space-between; 
+              align-items: center; 
+              background: #0f172a; 
+              padding: 12px 16px; 
+              border-radius: 8px; 
+              border: 1px solid #334155; 
+            }
+            .user-phone { font-family: monospace; font-size: 14px; }
+            .user-username { background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 12px; color: #34d399; }
+            .user-date { font-size: 12px; color: #64748b; }
+            
+            .btn-reset { 
+              background: rgba(244, 63, 94, 0.1); 
+              color: #f43f5e; 
+              border: 1px solid rgba(244, 63, 94, 0.2); 
+              padding: 10px 20px; 
+              border-radius: 8px; 
+              font-weight: 600; 
+              cursor: pointer; 
+              text-decoration: none; 
+              display: inline-block; 
+              transition: all 0.2s; 
+            }
+            .btn-reset:hover { 
+              background: #f43f5e; 
+              color: #fff; 
+            }
+            .no-users { text-align: center; color: #64748b; font-size: 14px; padding: 20px 0; }
           </style>
         </head>
         <body>
-          <div class="card">
-            <h2>✅ WhatsApp Bot Connected!</h2>
-            <p>The bot is authenticated and actively processing messages.</p>
-            <p style="color:#64748b; font-size: 14px;">No configuration or QR pairing needed.</p>
+          <div class="container">
+            <header>
+              <div>
+                <h1>Stellapp Dashboard</h1>
+                <p style="color: #64748b; margin: 5px 0 0 0; font-size: 14px;">Stellar WhatsApp AI Bot Administration</p>
+              </div>
+              <div class="status-badge">
+                <span class="status-dot"></span> Active & Online
+              </div>
+            </header>
+            
+            <div class="grid">
+              <div class="card">
+                <h3>Total Registered Users</h3>
+                <div class="value">${totalUsers}</div>
+                <div class="sub">WhatsApp wallets generated</div>
+              </div>
+              <div class="card">
+                <h3>Onboarded Users</h3>
+                <div class="value">${onboardedUsers}</div>
+                <div class="sub">Completed profile username setup</div>
+              </div>
+              <div class="card">
+                <h3>Stellar Network</h3>
+                <div class="value" style="color: #38bdf8; font-size: 24px; padding: 5px 0;">${process.env.STELLAR_NETWORK || 'TESTNET'}</div>
+                <div class="sub">${process.env.STELLAR_RPC_URL ? 'Soroban RPC Connected' : 'Horizon Mode Only'}</div>
+              </div>
+            </div>
+            
+            <div class="grid" style="grid-template-columns: 1fr 1fr;">
+              <!-- System Variables -->
+              <div class="card">
+                <h3 class="section-title">System Configurations</h3>
+                <table class="details-table">
+                  <tr>
+                    <td class="label">Stellar Horizon Node</td>
+                    <td class="val">${process.env.STELLAR_HORIZON_URL || 'Horizon offline'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Base Sepolia RPC</td>
+                    <td class="val">${process.env.EVM_RPC_URL || 'EVM offline'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">USDC Token Code</td>
+                    <td class="val">${process.env.USDC_ASSET_CODE || 'USDC'}</td>
+                  </tr>
+                  <tr>
+                    <td class="label">Escrow Contract WASM</td>
+                    <td class="val">${process.env.ESCROW_WASM_HASH ? process.env.ESCROW_WASM_HASH.substring(0, 16) + '...' : 'Not loaded'}</td>
+                  </tr>
+                </table>
+                
+                <h3 class="section-title">Control Actions</h3>
+                <div style="margin-top: 10px;">
+                  <a href="?token=${token}&action=reset" class="btn-reset" onclick="return confirm('Are you sure you want to log out and clear the active WhatsApp session cache? You will need to scan a new QR code to reconnect.')">♻️ Disconnect Bot & Reset Session</a>
+                </div>
+              </div>
+              
+              <!-- Recent Onboards -->
+              <div class="card">
+                <h3 class="section-title">Recent Registrations</h3>
+                <div class="users-list">
+                  ${recentUsersList.length === 0 ? `
+                    <div class="no-users">No users onboarded yet. Share your bot link to start!</div>
+                  ` : recentUsersList.map(u => {
+                    const cleanPhone = u.chatId.split("@")[0];
+                    const maskedPhone = cleanPhone.substring(0, 4) + '****' + cleanPhone.substring(cleanPhone.length - 4);
+                    return `
+                      <div class="user-item">
+                        <div>
+                          <span class="user-phone">+${maskedPhone}</span>
+                          ${u.username ? `<span class="user-username">@${u.username}</span>` : ''}
+                        </div>
+                        <span class="user-date">${new Date(u.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            </div>
           </div>
         </body>
       </html>
