@@ -97,101 +97,115 @@ export class WhatsAppBot {
     });
 
     this.client.on("message", async (msg) => {
-      // Avoid responding to group messages or status updates
-      if (msg.from.endsWith("@c.us")) {
-        try {
-          let text = msg.body;
-          let isVoice = false;
+      console.log(`[WhatsApp] Received message event: from=${msg.from}, body=${msg.body ? msg.body.substring(0, 60) : ""}, type=${msg.type}`);
+      
+      try {
+        if (!msg.from.endsWith("@c.us")) {
+          console.log(`[WhatsApp] Ignoring non-individual message from: ${msg.from}`);
+          return;
+        }
 
-          // Check if message is a voice note or audio file
-          if (msg.type === "ptt" || msg.type === "audio") {
-            if (msg.hasMedia) {
-              isVoice = true;
-              console.log(`[WhatsApp] Received voice message from ${msg.from}. Downloading...`);
-              const media = await msg.downloadMedia();
-              if (!media) {
-                await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
-                return;
-              }
-              
-              // Extract the file extension from the mime type (e.g. audio/ogg; codecs=opus -> ogg)
-              const extension = media.mimetype.split("/")[1]?.split(";")[0] || "ogg";
-              const tempFilePath = path.join(os.tmpdir(), `voice-${Date.now()}.${extension}`);
-              
-              fs.writeFileSync(tempFilePath, Buffer.from(media.data, "base64"));
-              
-              // Transcribe using OpenAI Whisper API
-              text = await transcribeAudio(tempFilePath);
-              
-              try {
-                fs.unlinkSync(tempFilePath);
-              } catch (e) {
-                console.error("Failed to delete temp audio file:", e);
-              }
-            } else {
+        let text = msg.body;
+        let isVoice = false;
+
+        // Check if message is a voice note or audio file
+        if (msg.type === "ptt" || msg.type === "audio") {
+          if (msg.hasMedia) {
+            isVoice = true;
+            console.log(`[WhatsApp] Received voice message from ${msg.from}. Downloading...`);
+            const media = await msg.downloadMedia();
+            if (!media) {
               await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
               return;
             }
-          }
-
-          if (!text || text.trim() === "") {
-            return; // Ignore empty message strings
-          }
-
-          console.log(`[WhatsApp] Processing input for ${msg.from}: "${text}"`);
-          let contactName = "";
-          try {
-            const contact = await msg.getContact();
-            contactName = contact.pushname || contact.name || "";
-          } catch (err: any) {
-            console.error("Failed to retrieve contact name:", err.message);
-          }
-
-          let response = await handleIncomingMessage(msg.from, text, contactName);
-          
-          if (response) {
-            let textToReply = response;
-            if (isVoice) {
-              textToReply = `🎤 _" ${text} "_\n\n${response}`;
-            }
             
-            // Send the text response first (with transcript context)
-            await msg.reply(textToReply);
+            // Extract the file extension from the mime type (e.g. audio/ogg; codecs=opus -> ogg)
+            const extension = media.mimetype.split("/")[1]?.split(";")[0] || "ogg";
+            const tempFilePath = path.join(os.tmpdir(), `voice-${Date.now()}.${extension}`);
+            
+            fs.writeFileSync(tempFilePath, Buffer.from(media.data, "base64"));
+            
+            // Transcribe using OpenAI Whisper API
+            text = await transcribeAudio(tempFilePath);
+            
+            try {
+              fs.unlinkSync(tempFilePath);
+            } catch (e) {
+              console.error("Failed to delete temp audio file:", e);
+            }
+          } else {
+            await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
+            return;
+          }
+        }
 
-            // If the user messaged us via voice, we talk back to them!
-            if (isVoice) {
+        if (!text || text.trim() === "") {
+          return; // Ignore empty message strings
+        }
+
+        console.log(`[WhatsApp] Processing input for ${msg.from}: "${text}"`);
+        let contactName = "";
+        try {
+          const contact = await msg.getContact();
+          contactName = contact.pushname || contact.name || "";
+        } catch (err: any) {
+          console.error("Failed to retrieve contact name:", err.message);
+        }
+
+        let response = await handleIncomingMessage(msg.from, text, contactName);
+        
+        if (response) {
+          let textToReply = response;
+          if (isVoice) {
+            textToReply = `🎤 _" ${text} "_\n\n${response}`;
+          }
+          
+          // Send the text response first (with transcript context)
+          await msg.reply(textToReply);
+
+          // If the user messaged us via voice, we talk back to them!
+          if (isVoice) {
+            try {
+              console.log(`[WhatsApp] Generating voice message reply for ${msg.from}...`);
+              const tempSpeechPath = path.join(os.tmpdir(), `speech-${Date.now()}.mp3`);
+              
+              // Clean response text from markdown symbols so it sounds natural
+              const cleanText = response
+                .replace(/[\*\_`#\-•]/g, "") // remove formatting marks
+                .replace(/https?:\/\/\S+/g, "link") // replace urls with "link"
+                .substring(0, 400); // limit speech content for low latency
+              
+              await generateSpeech(cleanText, tempSpeechPath);
+              
+              const media = MessageMedia.fromFilePath(tempSpeechPath);
+              await this.client.sendMessage(msg.from, media, { sendAudioAsVoice: true });
+              
               try {
-                console.log(`[WhatsApp] Generating voice message reply for ${msg.from}...`);
-                const tempSpeechPath = path.join(os.tmpdir(), `speech-${Date.now()}.mp3`);
-                
-                // Clean response text from markdown symbols so it sounds natural
-                const cleanText = response
-                  .replace(/[\*\_`#\-•]/g, "") // remove formatting marks
-                  .replace(/https?:\/\/\S+/g, "link") // replace urls with "link"
-                  .substring(0, 400); // limit speech content for low latency
-                
-                await generateSpeech(cleanText, tempSpeechPath);
-                
-                const media = MessageMedia.fromFilePath(tempSpeechPath);
-                await this.client.sendMessage(msg.from, media, { sendAudioAsVoice: true });
-                
-                try {
-                  fs.unlinkSync(tempSpeechPath);
-                } catch (e) {
-                  console.error("Failed to delete temp speech file:", e);
-                }
-              } catch (ttsError: any) {
-                console.error("[WhatsApp] Failed to generate and send voice note response:", ttsError.message);
+                fs.unlinkSync(tempSpeechPath);
+              } catch (e) {
+                console.error("Failed to delete temp speech file:", e);
               }
+            } catch (ttsError: any) {
+              console.error("[WhatsApp] Failed to generate and send voice note response:", ttsError.message);
             }
           }
-        } catch (error: any) {
-          console.error(`[WhatsApp] Error processing message from ${msg.from}:`, error.message);
+        }
+      } catch (error: any) {
+        console.error(`[WhatsApp] Error processing message from ${msg.from}:`, error.message);
+        try {
           await msg.reply("⚠️ Sorry, I encountered an internal error processing that request. Please try again.");
+        } catch (replyErr: any) {
+          console.error("Failed to send error reply:", replyErr.message);
         }
       }
     });
+
+    this.client.on("message_create", (msg) => {
+      // Trace outgoing and incoming events
+      console.log(`[WhatsApp Link Trace] Message created: from=${msg.from}, to=${msg.to}, body=${msg.body ? msg.body.substring(0, 40) : ""}`);
+    });
   }
+
   public initialize() {
     console.log("[WhatsApp] Initializing connection client...");
     this.cleanLockFiles();
@@ -205,43 +219,61 @@ export class WhatsAppBot {
     });
 
     // Watchdog to intercept page targets and override Storage APIs on load
-    const bindInterval = setInterval(() => {
+    const bindInterval = setInterval(async () => {
       if (this.client.pupBrowser) {
         clearInterval(bindInterval);
         console.log("[WhatsApp] Puppeteer browser detected. Binding interceptors...");
         try {
           const browser = this.client.pupBrowser;
+
+          const configurePage = async (page: any, source: string) => {
+            console.log(`[WhatsApp] Configuring page overrides (${source})...`);
+            try {
+              // Inject storage overrides before any site scripts execute
+              await page.evaluateOnNewDocument(() => {
+                if (navigator.storage) {
+                  // Bypass aquire-persistent-storage-denied by returning true directly
+                  navigator.storage.persist = () => Promise.resolve(true);
+                  navigator.storage.persisted = () => Promise.resolve(true);
+                }
+              });
+
+              // Apply immediately to the current context
+              await page.evaluate(() => {
+                if (navigator.storage) {
+                  navigator.storage.persist = () => Promise.resolve(true);
+                  navigator.storage.persisted = () => Promise.resolve(true);
+                }
+              }).catch(() => {});
+              
+              // Connect console logs
+              page.on("console", (msg: any) => {
+                const txt = msg.text();
+                if (msg.type() === "error" || txt.includes("failed") || txt.includes("Error") || txt.includes("warning")) {
+                  console.log(`[Browser Console ${msg.type().toUpperCase()}] ${txt}`);
+                }
+              });
+              
+              page.on("pageerror", (err: any) => {
+                console.error("[Browser Page Exception]", err.message);
+              });
+            } catch (evalErr: any) {
+              console.error(`[WhatsApp] Failed page configuration (${source}):`, evalErr.message);
+            }
+          };
+
+          // Apply to existing page immediately
+          const existingPages = await browser.pages();
+          for (const page of existingPages) {
+            await configurePage(page, "existing");
+          }
           
+          // Apply to future pages
           browser.on("targetcreated", async (target) => {
             if (target.type() === "page") {
               const page = await target.page();
               if (page) {
-                console.log("[WhatsApp] Target page created. Injecting Storage API overrides...");
-                
-                try {
-                  // Inject storage overrides before any site scripts execute
-                  await page.evaluateOnNewDocument(() => {
-                    if (navigator.storage) {
-                      // Bypass aquire-persistent-storage-denied by returning true directly
-                      navigator.storage.persist = () => Promise.resolve(true);
-                      navigator.storage.persisted = () => Promise.resolve(true);
-                    }
-                  });
-                  
-                  // Connect console logs
-                  page.on("console", (msg) => {
-                    const txt = msg.text();
-                    if (msg.type() === "error" || txt.includes("failed") || txt.includes("Error") || txt.includes("warning")) {
-                      console.log(`[Browser Console ${msg.type().toUpperCase()}] ${txt}`);
-                    }
-                  });
-                  
-                  page.on("pageerror", (err: any) => {
-                    console.error("[Browser Page Exception]", err.message);
-                  });
-                } catch (evalErr: any) {
-                  console.error("[WhatsApp] Failed page configuration:", evalErr.message);
-                }
+                await configurePage(page, "new target");
               }
             }
           });
@@ -251,6 +283,7 @@ export class WhatsAppBot {
       }
     }, 50);
   }
+
 
   public async sendMessage(chatId: string, text: string): Promise<void> {
     await this.client.sendMessage(chatId, text);
