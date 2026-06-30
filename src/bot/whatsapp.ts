@@ -53,15 +53,26 @@ export class WhatsAppBot {
         console.warn("[WhatsApp] Failed to recursively set permissions:", chmodErr.message);
       }
 
-      const lockPaths = [
-        path.join(authDir, "session/SingletonLock"),
-        path.join(authDir, "session/Default/SingletonLock")
+      // Specifically remove all Chromium lock files that cause the "profile appears to be in use" (Code 21) crash loop
+      const sessionDirs = [
+        path.join(authDir, "session"),
+        path.join(authDir, "session/Default")
       ];
-      
-      for (const lockPath of lockPaths) {
-        if (fs.existsSync(lockPath)) {
-          console.log(`[WhatsApp] Stale lock file found: ${lockPath}. Removing it...`);
-          fs.unlinkSync(lockPath);
+
+      for (const sDir of sessionDirs) {
+        if (fs.existsSync(sDir)) {
+          try {
+            const files = fs.readdirSync(sDir);
+            for (const file of files) {
+              if (file.startsWith("Singleton")) {
+                const lockPath = path.join(sDir, file);
+                console.log(`[WhatsApp] Stale lock file found: ${lockPath}. Removing it...`);
+                fs.unlinkSync(lockPath);
+              }
+            }
+          } catch (e: any) {
+            console.warn(`[WhatsApp] Could not clean lock files in ${sDir}:`, e.message);
+          }
         }
       }
     } catch (err: any) {
