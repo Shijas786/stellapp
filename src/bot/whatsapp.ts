@@ -37,6 +37,7 @@ export class WhatsAppBot {
     });
 
     this.client.on("authenticated", () => {
+      (global as any).__latestQR = null; // Clear QR immediately on authentication
       console.log("[WhatsApp] Session authenticated successfully.");
     });
 
