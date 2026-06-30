@@ -178,6 +178,7 @@ export class WhatsAppBot {
   public initialize() {
     console.log("[WhatsApp] Initializing connection client...");
     this.cleanLockFiles();
+    
     this.client.initialize().catch((err) => {
       console.error("[WhatsApp] Failed to initialize client:", err.message);
       // Exit the process so Railway automatically restarts and retries
@@ -185,6 +186,29 @@ export class WhatsAppBot {
         process.exit(1);
       }, 1000);
     });
+
+    // Watchdog to attach console log listeners to the page for deep debugging
+    const bindInterval = setInterval(() => {
+      if (this.client.pupPage) {
+        clearInterval(bindInterval);
+        console.log("[WhatsApp] Browser page detected. Binding console debug listeners...");
+        try {
+          const page = this.client.pupPage;
+          page.on("console", (msg) => {
+            const txt = msg.text();
+            // Filter out verbose debug info, log errors and alerts
+            if (msg.type() === "error" || txt.includes("failed") || txt.includes("Error") || txt.includes("warning")) {
+              console.log(`[Browser Console ${msg.type().toUpperCase()}] ${txt}`);
+            }
+          });
+          page.on("pageerror", (err: any) => {
+            console.error("[Browser Page Exception]", err.message);
+          });
+        } catch (e: any) {
+          console.error("[WhatsApp] Error setting up console monitors:", e.message);
+        }
+      }
+    }, 100);
   }
 
   public async sendMessage(chatId: string, text: string): Promise<void> {
