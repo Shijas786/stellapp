@@ -34,7 +34,7 @@ http.createServer(async (_req, res) => {
   
   // Require token verification to access the setup page
   if (query.token !== token) {
-    res.writeHead(403, { "Content-Type": "text/html" });
+    res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <html>
         <head>
@@ -62,7 +62,7 @@ http.createServer(async (_req, res) => {
   // Check if WhatsApp is already authenticated and active
   const qr = (global as any).__latestQR as string | undefined;
   if (!qr) {
-    res.writeHead(200, { "Content-Type": "text/html" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <html>
         <head>
@@ -108,7 +108,7 @@ http.createServer(async (_req, res) => {
 
   try {
     const qrImageUrl = await QRCode.toDataURL(qr);
-    res.writeHead(200, { "Content-Type": "text/html" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <html>
         <head>
@@ -187,6 +187,19 @@ http.createServer(async (_req, res) => {
               </div>
             </div>
           </div>
+
+          <script>
+            // Automatically refresh the page every 15 seconds to fetch a fresh QR code,
+            // but do not refresh if the user has requested and is viewing a phone pairing code.
+            setTimeout(() => {
+              const hasCode = !!document.querySelector('.code-display');
+              const hasError = !!document.querySelector('.error');
+              if (!hasCode && !hasError) {
+                console.log("[Setup] Refreshing to keep QR code fresh...");
+                window.location.reload();
+              }
+            }, 15000);
+          </script>
         </body>
       </html>
     `);
