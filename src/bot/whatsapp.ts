@@ -36,9 +36,23 @@ export class WhatsAppBot {
 
   private cleanLockFiles() {
     try {
+      const authDir = path.join(process.cwd(), ".wwebjs_auth");
+      if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+      }
+
+      // Recursively grant read/write/execute permissions to prevent permission-denied storage errors inside Docker
+      try {
+        const { execSync } = require("child_process");
+        execSync(`chmod -R 777 "${authDir}"`);
+        console.log("[WhatsApp] Successfully set write permissions on auth directory.");
+      } catch (chmodErr: any) {
+        console.warn("[WhatsApp] Failed to recursively set permissions:", chmodErr.message);
+      }
+
       const lockPaths = [
-        path.join(process.cwd(), ".wwebjs_auth/session/SingletonLock"),
-        path.join(process.cwd(), ".wwebjs_auth/session/Default/SingletonLock")
+        path.join(authDir, "session/SingletonLock"),
+        path.join(authDir, "session/Default/SingletonLock")
       ];
       
       for (const lockPath of lockPaths) {
@@ -48,7 +62,7 @@ export class WhatsAppBot {
         }
       }
     } catch (err: any) {
-      console.error("[WhatsApp] Failed to clean browser lock files:", err.message);
+      console.error("[WhatsApp] Failed to clean browser lock files or permissions:", err.message);
     }
   }
 
