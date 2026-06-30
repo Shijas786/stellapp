@@ -35,7 +35,74 @@ http.createServer(async (_req, res) => {
   const query = parsedUrl.query;
   const token = process.env.ENCRYPTION_KEY || "";
   
-  // Require token verification to access the setup page
+  // 1. Stellar Federation TOML Endpoint
+  if (parsedUrl.pathname === "/.well-known/stellar.toml") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end(`FEDERATION_SERVER="https://${_req.headers.host}/api/federation"\n`);
+    return;
+  }
+
+  // 2. Stellar Federation API Endpoint
+  if (parsedUrl.pathname === "/api/federation") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    
+    if (query.type === "name" && typeof query.q === "string") {
+      const parts = query.q.split("*");
+      if (parts.length === 2) {
+        const username = parts[0].toLowerCase();
+        try {
+          const user = await prisma.user.findFirst({ where: { username } });
+          if (user && user.stellarPublic) {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+              stellar_address: user.stellarPublic,
+              account_id: user.stellarPublic,
+              memo_type: "text",
+              memo: "Stellapp"
+            }));
+            return;
+          }
+        } catch (e) {
+          console.error("Federation DB Error:", e);
+        }
+      }
+    }
+    
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ detail: "Account not found." }));
+    return;
+  }
+
+  // 3. Serve Public Landing Page
+  if (parsedUrl.pathname === "/" && !query.token) {
+    const indexPath = path.join(process.cwd(), "public", "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(fs.readFileSync(indexPath));
+      return;
+    }
+  }
+
+  // 4. Serve Public Assets (CSS, JS, Images)
+  if (parsedUrl.pathname?.startsWith("/assets/")) {
+    const assetPath = path.join(process.cwd(), "public", parsedUrl.pathname.replace("/assets/", ""));
+    if (fs.existsSync(assetPath)) {
+      const ext = path.extname(assetPath);
+      let contentType = "text/plain";
+      if (ext === ".css") contentType = "text/css";
+      else if (ext === ".js") contentType = "application/javascript";
+      else if (ext === ".png") contentType = "image/png";
+      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+      else if (ext === ".svg") contentType = "image/svg+xml";
+      
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(fs.readFileSync(assetPath));
+      return;
+    }
+  }
+
+  // Require token verification to access the dashboard/setup page
   if (query.token !== token) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`

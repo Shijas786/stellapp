@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellapp | AI Crypto Assistant on WhatsApp</title>
+    <meta name="description" content="Manage your Stellar and EVM crypto directly from WhatsApp. Send, swap, bridge, and deploy smart contracts simply by chatting.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <nav class="navbar glass">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#paint0_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 17L12 22L22 17" stroke="url(#paint1_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 12L12 17L22 12" stroke="url(#paint2_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <defs>
+                    <linearGradient id="paint0_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#38bdf8"/>
+                        <stop offset="1" stop-color="#818cf8"/>
+                    </linearGradient>
+                    <linearGradient id="paint1_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#38bdf8"/>
+                        <stop offset="1" stop-color="#818cf8"/>
+                    </linearGradient>
+                    <linearGradient id="paint2_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#38bdf8"/>
+                        <stop offset="1" stop-color="#818cf8"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+            <span>Stellapp</span>
+        </div>
+        <a href="#connect" class="nav-btn glass-btn">Connect WhatsApp</a>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <div class="badge glass">🔥 Powered by OpenAI & Stellar</div>
+            <h1>Your AI Crypto Assistant <br/><span class="text-gradient">on WhatsApp</span></h1>
+            <p>Send payments, bridge USDC, swap tokens, and deploy Soroban smart contracts using just your voice or text.</p>
+            <div class="cta-group">
+                <a href="#connect" class="primary-btn">Start Chatting Now</a>
+                <a href="#features" class="secondary-btn glass-btn">View Features</a>
+            </div>
+        </div>
+        
+        <div class="hero-visual">
+            <div class="phone-mockup glass">
+                <div class="phone-header">
+                    <div class="contact-info">
+                        <div class="avatar">S</div>
+                        <div class="contact-name">Stellapp AI <span class="verified">✓</span></div>
+                    </div>
+                </div>
+                <div class="phone-body">
+                    <div class="message received">👋 Welcome to Stellapp! Your Stellar address is ready.</div>
+                    <div class="message sent">Send 10 USDC to shijas</div>
+                    <div class="message received typing">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+                <div class="phone-footer">
+                    <div class="input-bar">Message...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <div class="feature-card glass">
+            <div class="icon">💬</div>
+            <h3>Natural Language</h3>
+            <p>No complex UIs. Just text or send voice notes in English, Hindi, Tamil, or Malayalam to execute blockchain transactions.</p>
+        </div>
+        <div class="feature-card glass">
+            <div class="icon">🌉</div>
+            <h3>Cross-Chain Bridging</h3>
+            <p>Bridge USDC instantly between EVM (Base) and Stellar using Circle's CCTP, all verified through AI.</p>
+        </div>
+        <div class="feature-card glass">
+            <div class="icon">📜</div>
+            <h3>Smart Contracts</h3>
+            <p>Deploy custom Soroban escrow contracts and privacy pools directly from your chat window.</p>
+        </div>
+    </section>
+
+    <footer class="glass">
+        <p>&copy; 2026 Stellapp. Built on Stellar. Hosted on Railway.</p>
+    </footer>
+
+    <script>
+        // Simple typing animation logic for the mockup
+        setTimeout(() => {
+            const typing = document.querySelector('.typing');
+            typing.innerHTML = "✅ Transaction successful! Sent 10 USDC to shijas*stellapp.com.<br><br>Tx Hash: <code>a7f8...9b2c</code>";
+            typing.classList.remove('typing');
+        }, 3000);
+    </script>
+</body>
+</html>

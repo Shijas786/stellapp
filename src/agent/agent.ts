@@ -116,7 +116,8 @@ export async function transcribeAudio(filePath: string): Promise<string> {
   console.log(`[Whisper] Sending ${filePath} for transcription...`);
   const response = await openai.audio.transcriptions.create({
     file: fs.createReadStream(filePath),
-    model: "whisper-1"
+    model: "whisper-1",
+    prompt: "The audio might be in Malayalam, English, Hindi, or Tamil."
   });
   console.log(`[Whisper] Transcript: "${response.text}"`);
   return response.text;

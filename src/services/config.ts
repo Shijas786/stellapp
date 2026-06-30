@@ -50,12 +50,12 @@ export const config = {
     : (process.env.CIRCLE_API_URL || "https://iris-api-sandbox.circle.com"),
     
   explorerUrlStellar: IS_MAINNET 
-    ? "https://stellar.org/explorer/public/tx/"
-    : "https://stellar.org/explorer/testnet/tx/",
+    ? "https://stellar.expert/explorer/public/tx/"
+    : "https://stellar.expert/explorer/testnet/tx/",
     
   explorerUrlStellarContract: IS_MAINNET
-    ? "https://stellar.org/explorer/public/contract/"
-    : "https://stellar.org/explorer/testnet/contract/",
+    ? "https://stellar.expert/explorer/public/contract/"
+    : "https://stellar.expert/explorer/testnet/contract/",
     
   explorerUrlBase: IS_MAINNET
     ? "https://basescan.org/tx/"

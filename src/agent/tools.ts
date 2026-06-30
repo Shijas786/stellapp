@@ -346,7 +346,7 @@ export async function executeTool(
       return {
         success: true,
         username,
-        federatedAddress: `${username}*bot.com`
+        federatedAddress: `${username}*stellapp.com`
       };
     }
 

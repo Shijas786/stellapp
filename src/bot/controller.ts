@@ -91,21 +91,23 @@ export async function handleIncomingMessage(
     }
 
     const usernameStatus = user.username 
-      ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*bot.com\`)\n\n`
+      ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*stellapp.com\`)\n\n`
       : "";
 
-    return `👋 *Welcome to the Stellar WhatsApp AI Bot!* 🚀\n\n` +
-      `I have automatically created dedicated Stellar and EVM wallets linked to your phone number.\n\n` +
+    return `👋 *Welcome to Stellapp - Your AI Crypto Assistant!* 🚀\n\n` +
+      `Stellapp lets you manage your crypto directly from WhatsApp. You can send payments, swap tokens, bridge between networks, and even deploy smart contracts simply by chatting with me.\n\n` +
+      `To get you started, I've securely created dedicated Stellar and EVM wallets linked to your phone number.\n\n` +
       `✨ *Your Stellar Address (${networkNameStellar}):*\n\`${user.stellarPublic}\`\n\n` +
       `⛓️ *Your EVM Address (${networkNameEVM}):*\n\`${user.evmAddress}\`\n\n` +
       usernameStatus +
       `${fundingStatus}\n\n` +
-      `💡 *What can I do?*\n` +
-      `• Ask me: *"What's my balance?"*\n` +
-      `• Ask me: *"Swap 50 XLM to USDC"*\n` +
-      `• Ask me: *"Send 10 USDC to G..."*\n` +
-      `• Ask me: *"Bridge 10 USDC from EVM"*\n` +
-      `• Ask me: *"Deploy an escrow contract with 2 days timeout"*`;
+      `💡 *Here's what you can try (Reply with 1, 2, 3, 4, or 5):*\n` +
+      `*1️⃣* "What's my balance?"\n` +
+      `*2️⃣* "Send 10 USDC to John"\n` +
+      `*3️⃣* "Swap 50 XLM to USDC"\n` +
+      `*4️⃣* "Bridge 10 USDC from EVM"\n` +
+      `*5️⃣* "Deploy an escrow contract for 2 days"\n\n` +
+      `Feel free to send voice notes in English, Hindi, Tamil, or Malayalam!`;
   }
 
   if (!user) {
