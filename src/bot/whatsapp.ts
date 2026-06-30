@@ -61,6 +61,10 @@ export class WhatsAppBot {
       console.log("[WhatsApp] Raw QR (for local debug):", qr.substring(0, 40) + "...");
     });
 
+    this.client.on("loading_screen", (percent, message) => {
+      console.log(`[WhatsApp Loading] Progress: ${percent}% - ${message}`);
+    });
+
     this.client.on("ready", () => {
       (global as any).__latestQR = null; // Clear QR — session is now active
       console.log("\n[WhatsApp] Client is connected and ready to process messages!");
