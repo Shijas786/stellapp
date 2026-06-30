@@ -147,4 +147,9 @@ export class WhatsAppBot {
   public async sendMessage(chatId: string, text: string): Promise<void> {
     await this.client.sendMessage(chatId, text);
   }
+
+  public async getPairingCode(phoneNumber: string): Promise<string> {
+    console.log(`[WhatsApp] Requesting pairing code for: ${phoneNumber}`);
+    return await this.client.requestPairingCode(phoneNumber);
+  }
 }
