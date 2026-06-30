@@ -29,6 +29,22 @@ setNotificationSender(async (chatId, text) => {
 // Visit your Railway URL to see the QR code and link your WhatsApp account.
 const PORT = process.env.PORT || 3000;
 http.createServer(async (_req, res) => {
+  const token = process.env.ENCRYPTION_KEY || "";
+  const reqUrl = _req.url || "";
+  
+  // Require token verification to access the QR setup page (prevents random scans)
+  if (!reqUrl.includes(`token=${token}`)) {
+    res.writeHead(403, { "Content-Type": "text/html" });
+    res.end(`
+      <html><body style="text-align:center;font-family:sans-serif;padding:100px;background:#f7f9fa;color:#333">
+        <h2>🔒 Administration Panel Locked</h2>
+        <p style="color:gray">To link this bot to WhatsApp, you must provide your ENCRYPTION_KEY in the URL parameters.</p>
+        <code style="background:#eee;padding:8px 12px;border-radius:4px;font-size:14px">?token=YOUR_ENCRYPTION_KEY</code>
+      </body></html>
+    `);
+    return;
+  }
+
   const qr = (global as any).__latestQR as string | undefined;
   if (!qr) {
     res.writeHead(200, { "Content-Type": "text/html" });
