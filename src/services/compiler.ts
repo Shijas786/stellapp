@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 
-const COMPILER_DIR = "/Users/shijas/stellapp/scratch/compiler";
+const COMPILER_DIR = path.join(process.cwd(), "scratch/compiler");
 
 /**
  * Compiles a custom Soroban smart contract (Rust) into WASM bytecode.
@@ -17,6 +17,9 @@ export function compileRustContract(rustCode: string): Buffer {
 
   console.log("[Compiler] Executing Cargo build target wasm32-unknown-unknown...");
   try {
+    // Ensure the rust wasm target is installed in the Railway container before building
+    execSync("rustup target add wasm32-unknown-unknown", { stdio: "ignore" });
+
     // Run cargo build synchronously. This is extremely fast because dependencies are cached.
     execSync("cargo build --target wasm32-unknown-unknown --release", {
       cwd: COMPILER_DIR,
