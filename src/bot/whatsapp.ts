@@ -100,7 +100,8 @@ export class WhatsAppBot {
       console.log(`[WhatsApp] Received message event: from=${msg.from}, body=${msg.body ? msg.body.substring(0, 60) : ""}, type=${msg.type}`);
       
       try {
-        if (!msg.from.endsWith("@c.us")) {
+        const isIndividualChat = msg.from.endsWith("@c.us") || msg.from.endsWith("@lid");
+        if (!isIndividualChat) {
           console.log(`[WhatsApp] Ignoring non-individual message from: ${msg.from}`);
           return;
         }
