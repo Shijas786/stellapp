@@ -26,7 +26,10 @@ export class WhatsAppBot {
           "--no-first-run",
           "--no-zygote",
           "--single-process",
-          "--disable-gpu"
+          "--disable-gpu",
+          "--disable-features=IsolateOrigins,site-per-process",
+          "--disable-site-isolation-trials",
+          "--renderer-process-limit=2"
         ]
       }
     });
