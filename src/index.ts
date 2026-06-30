@@ -74,9 +74,9 @@ http.createServer(async (_req, res) => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end("<h2>♻️ Session purged successfully!</h2><p>The container will now restart and generate a clean QR code. Please wait 30 seconds and refresh the setup page.</p>");
       
-      // Terminate the process cleanly so Railway restarts the container
+      // Terminate the process with a non-zero code to force Railway to restart the container
       setTimeout(() => {
-        process.exit(0);
+        process.exit(1);
       }, 1000);
       return;
     } catch (err: any) {
