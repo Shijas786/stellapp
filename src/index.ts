@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
 import http from "http";
 import url from "url";
+import fs from "fs";
+import path from "path";
 import QRCode from "qrcode";
 import { WhatsAppBot } from "./bot/whatsapp";
 import { setNotificationSender } from "./agent/tools";
@@ -57,6 +59,31 @@ http.createServer(async (_req, res) => {
       </html>
     `);
     return;
+  }
+
+  // Handle manual session reset & cache purge
+  if (query.action === "reset") {
+    try {
+      console.log("[Setup] Admin requested session reset. Purging local session data...");
+      const authDir = path.join(process.cwd(), ".wwebjs_auth");
+      const cacheDir = path.join(process.cwd(), ".wwebjs_cache");
+      
+      fs.rmSync(authDir, { recursive: true, force: true });
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+      
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<h2>♻️ Session purged successfully!</h2><p>The container will now restart and generate a clean QR code. Please wait 30 seconds and refresh the setup page.</p>");
+      
+      // Terminate the process cleanly so Railway restarts the container
+      setTimeout(() => {
+        process.exit(0);
+      }, 1000);
+      return;
+    } catch (err: any) {
+      res.writeHead(500);
+      res.end(`Failed to reset session: ${err.message}`);
+      return;
+    }
   }
 
   // Check if WhatsApp is already authenticated and active
@@ -185,6 +212,9 @@ http.createServer(async (_req, res) => {
                   </form>
                 `}
               </div>
+            </div>
+            <div style="text-align:center; margin-top:30px;">
+              <a href="?token=${token}&action=reset" style="color:#64748b; font-size:13px; text-decoration:none; border: 1px dashed #475569; padding: 6px 12px; border-radius: 6px; display: inline-block; transition: color 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">♻️ Stale QR or Sync Hung? Reset and Generate Fresh QR</a>
             </div>
           </div>
 
