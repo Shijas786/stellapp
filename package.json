@@ -20,7 +20,7 @@
     "openai": "^4.85.4",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#main"
+    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#f935b500117e264c2b3abc25b63a280bd98182a7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
