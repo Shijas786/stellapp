@@ -15,7 +15,17 @@ export class WhatsAppBot {
         dataPath: ".wwebjs_auth"
       }),
       puppeteer: {
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process"
+        ],
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
       }
     });
 
@@ -58,6 +68,10 @@ export class WhatsAppBot {
               isVoice = true;
               console.log(`[WhatsApp] Received voice message from ${msg.from}. Downloading...`);
               const media = await msg.downloadMedia();
+              if (!media) {
+                await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
+                return;
+              }
               
               // Extract the file extension from the mime type (e.g. audio/ogg; codecs=opus -> ogg)
               const extension = media.mimetype.split("/")[1]?.split(";")[0] || "ogg";
