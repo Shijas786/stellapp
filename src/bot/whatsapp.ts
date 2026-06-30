@@ -204,28 +204,52 @@ export class WhatsAppBot {
       }, 1000);
     });
 
-    // Watchdog to attach console log listeners to the page for deep debugging
+    // Watchdog to intercept page targets and override Storage APIs on load
     const bindInterval = setInterval(() => {
-      if (this.client.pupPage) {
+      if (this.client.pupBrowser) {
         clearInterval(bindInterval);
-        console.log("[WhatsApp] Browser page detected. Binding console debug listeners...");
+        console.log("[WhatsApp] Puppeteer browser detected. Binding interceptors...");
         try {
-          const page = this.client.pupPage;
-          page.on("console", (msg) => {
-            const txt = msg.text();
-            // Filter out verbose debug info, log errors and alerts
-            if (msg.type() === "error" || txt.includes("failed") || txt.includes("Error") || txt.includes("warning")) {
-              console.log(`[Browser Console ${msg.type().toUpperCase()}] ${txt}`);
+          const browser = this.client.pupBrowser;
+          
+          browser.on("targetcreated", async (target) => {
+            if (target.type() === "page") {
+              const page = await target.page();
+              if (page) {
+                console.log("[WhatsApp] Target page created. Injecting Storage API overrides...");
+                
+                try {
+                  // Inject storage overrides before any site scripts execute
+                  await page.evaluateOnNewDocument(() => {
+                    if (navigator.storage) {
+                      // Bypass aquire-persistent-storage-denied by returning true directly
+                      navigator.storage.persist = () => Promise.resolve(true);
+                      navigator.storage.persisted = () => Promise.resolve(true);
+                    }
+                  });
+                  
+                  // Connect console logs
+                  page.on("console", (msg) => {
+                    const txt = msg.text();
+                    if (msg.type() === "error" || txt.includes("failed") || txt.includes("Error") || txt.includes("warning")) {
+                      console.log(`[Browser Console ${msg.type().toUpperCase()}] ${txt}`);
+                    }
+                  });
+                  
+                  page.on("pageerror", (err: any) => {
+                    console.error("[Browser Page Exception]", err.message);
+                  });
+                } catch (evalErr: any) {
+                  console.error("[WhatsApp] Failed page configuration:", evalErr.message);
+                }
+              }
             }
           });
-          page.on("pageerror", (err: any) => {
-            console.error("[Browser Page Exception]", err.message);
-          });
         } catch (e: any) {
-          console.error("[WhatsApp] Error setting up console monitors:", e.message);
+          console.error("[WhatsApp] Error setting up browser monitors:", e.message);
         }
       }
-    }, 100);
+    }, 50);
   }
 
   public async sendMessage(chatId: string, text: string): Promise<void> {
