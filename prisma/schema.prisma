@@ -1,0 +1,21 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String   @id @default(uuid())
+  chatId         String   @unique // WhatsApp phone number, e.g. "919876543210@c.us"
+  username       String?  @unique // Custom federated username, e.g. "bob"
+  stellarPublic  String   @unique
+  stellarSecret  String   // AES-256-GCM encrypted
+  evmAddress     String   @unique
+  evmPrivateKey  String   // AES-256-GCM encrypted
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  onboarded      Boolean  @default(false)
+}
