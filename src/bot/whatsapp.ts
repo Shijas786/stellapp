@@ -100,10 +100,37 @@ export class WhatsAppBot {
       console.log(`[WhatsApp] Received message event: from=${msg.from}, body=${msg.body ? msg.body.substring(0, 60) : ""}, type=${msg.type}`);
       
       try {
+        const isGroup = msg.from.endsWith("@g.us");
         const isIndividualChat = msg.from.endsWith("@c.us") || msg.from.endsWith("@lid");
-        if (!isIndividualChat) {
-          console.log(`[WhatsApp] Ignoring non-individual message from: ${msg.from}`);
+        
+        if (!isIndividualChat && !isGroup) {
+          console.log(`[WhatsApp] Ignoring unknown message format from: ${msg.from}`);
           return;
+        }
+
+        if (isGroup) {
+          let isMentioned = false;
+          let isReplyToMe = false;
+
+          try {
+            const mentions = await msg.getMentions();
+            isMentioned = mentions.some(contact => contact.isMe);
+
+            if (msg.hasQuotedMsg) {
+              const quoted = await msg.getQuotedMessage();
+              if (quoted.fromMe) {
+                isReplyToMe = true;
+              }
+            }
+          } catch (e) {
+            console.error("Error checking group mentions:", e);
+          }
+
+          if (!isMentioned && !isReplyToMe) {
+            // Ignore normal group chatter
+            return;
+          }
+          console.log(`[WhatsApp] Bot activated in group ${msg.from} via ${isMentioned ? 'mention' : 'reply'}`);
         }
 
         let text = msg.body;
@@ -113,7 +140,7 @@ export class WhatsAppBot {
         if (msg.type === "ptt" || msg.type === "audio") {
           if (msg.hasMedia) {
             isVoice = true;
-            console.log(`[WhatsApp] Received voice message from ${msg.from}. Downloading...`);
+            console.log(`[WhatsApp] Received voice message. Downloading...`);
             const media = await msg.downloadMedia();
             if (!media) {
               await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
@@ -144,7 +171,9 @@ export class WhatsAppBot {
           return; // Ignore empty message strings
         }
 
-        console.log(`[WhatsApp] Processing input for ${msg.from}: "${text}"`);
+        // The actual sender's phone number ID (msg.author exists for groups, msg.from for direct)
+        const senderId = msg.author || msg.from;
+        console.log(`[WhatsApp] Processing input for ${senderId}: "${text}"`);
         let contactName = "";
         try {
           const contact = await msg.getContact();
@@ -153,7 +182,7 @@ export class WhatsAppBot {
           console.error("Failed to retrieve contact name:", err.message);
         }
 
-        let response = await handleIncomingMessage(msg.from, text, contactName);
+        let response = await handleIncomingMessage(senderId, text, contactName);
         
         if (response) {
           let textToReply = response;
