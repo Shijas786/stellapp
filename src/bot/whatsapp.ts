@@ -14,8 +14,10 @@ export class WhatsAppBot {
       authStrategy: new LocalAuth({
         dataPath: ".wwebjs_auth"
       }),
+      authTimeoutMs: 60000, // Allow up to 60s for authentication handshake
       puppeteer: {
         headless: true,
+        timeout: 60000, // Allow up to 60s for Puppeteer Chrome to launch
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -153,11 +155,14 @@ export class WhatsAppBot {
       }
     });
   }
-
   public initialize() {
     console.log("[WhatsApp] Initializing connection client...");
     this.client.initialize().catch((err) => {
       console.error("[WhatsApp] Failed to initialize client:", err.message);
+      // Exit the process so Railway automatically restarts and retries
+      setTimeout(() => {
+        process.exit(1);
+      }, 1000);
     });
   }
 
