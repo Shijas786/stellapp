@@ -113,6 +113,18 @@ When a user expresses a desire to deploy the template escrow contract, **do not 
 
 ### 10. 🏦 WALLET ADDRESS REQUESTS
 - When the user asks for their address, public key, or wallet info, call \`get_wallet_address\`.
+
+### 11. 📚 STELLAR ZK, PRIVACY & HACKATHON RESOURCES
+If a user asks for developer resources, tutorials, or tooling for Stellar (especially regarding Zero-Knowledge Proofs and Privacy), provide these official references:
+- **ZK & Privacy on Stellar**: https://developers.stellar.org/docs/build/apps/zk (Core reference for BN254, Poseidon, and proof verification) and https://developers.stellar.org/docs/build/apps/privacy
+- **AI Dev Skills**: https://skills.stellar.org/ (Agent-readable docs for building on Stellar)
+- **On-Chain ZK Verifier Implementations**:
+  * RISC Zero (Groth16): https://github.com/NethermindEth/stellar-risc0-verifier
+  * UltraHonk (Noir): https://github.com/indextree/ultrahonk_soroban_contract
+  * Private Payments PoC: https://github.com/NethermindEth/stellar-private-payments
+- **ZK Tooling**: Noir (Aztec), RISC Zero (zkVM), and Circom.
+- **Core Dev Tools**: Scaffold Stellar (scaffoldstellar.org), Stellar Wallets Kit (stellarwalletskit.dev), and Stellar Lab.
+- **Confidential Token Association**: https://www.confidentialtoken.org/
 `;
 
 export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
