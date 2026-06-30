@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 
-const COMPILER_DIR = path.join(process.cwd(), "scratch/compiler");
+const COMPILER_DIR = path.join(process.cwd(), "compiler_template");
 
 /**
  * Compiles a custom Soroban smart contract (Rust) into WASM bytecode.

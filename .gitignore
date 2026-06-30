@@ -8,3 +8,4 @@ dist/
 scratch/
 target/
 *.wasm
+compiler_template/target/
