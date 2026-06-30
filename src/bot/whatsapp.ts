@@ -14,26 +14,42 @@ export class WhatsAppBot {
       authStrategy: new LocalAuth({
         dataPath: ".wwebjs_auth"
       }),
-      authTimeoutMs: 60000, // Allow up to 60s for authentication handshake
+      authTimeoutMs: 60000,
       puppeteer: {
         headless: true,
-        timeout: 60000, // Allow up to 60s for Puppeteer Chrome to launch
+        timeout: 60000,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-gpu",
+          "--disable-accelerated-2d-canvas",
           "--no-first-run",
           "--no-zygote",
-          "--disable-features=IsolateOrigins,site-per-process",
-          "--disable-site-isolation-trials",
-          "--renderer-process-limit=2"
-        ],
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+          "--single-process",
+          "--disable-gpu"
+        ]
       }
     });
 
     this.setupListeners();
+  }
+
+  private cleanLockFiles() {
+    try {
+      const lockPaths = [
+        path.join(process.cwd(), ".wwebjs_auth/session/SingletonLock"),
+        path.join(process.cwd(), ".wwebjs_auth/session/Default/SingletonLock")
+      ];
+      
+      for (const lockPath of lockPaths) {
+        if (fs.existsSync(lockPath)) {
+          console.log(`[WhatsApp] Stale lock file found: ${lockPath}. Removing it...`);
+          fs.unlinkSync(lockPath);
+        }
+      }
+    } catch (err: any) {
+      console.error("[WhatsApp] Failed to clean browser lock files:", err.message);
+    }
   }
 
   private setupListeners() {
@@ -157,6 +173,7 @@ export class WhatsAppBot {
   }
   public initialize() {
     console.log("[WhatsApp] Initializing connection client...");
+    this.cleanLockFiles();
     this.client.initialize().catch((err) => {
       console.error("[WhatsApp] Failed to initialize client:", err.message);
       // Exit the process so Railway automatically restarts and retries
