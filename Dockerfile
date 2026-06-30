@@ -25,20 +25,27 @@ RUN apt-get update && apt-get install -y \
   --no-install-recommends && \
   rm -rf /var/lib/apt/lists/*
 
-# Tell Puppeteer to skip its own Chrome download and use system Chromium
+# Tell Puppeteer to use system Chromium (skip downloading its own)
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+
+# Install ALL deps including devDependencies (needed for tsc + @types/*)
+RUN npm ci
 
 COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY . .
+
+# Build TypeScript (requires devDependencies: typescript, @types/*)
 RUN npm run build
+
+# Remove devDependencies after build — production image only needs dist/
+RUN npm prune --omit=dev
 
 EXPOSE 3000
 
