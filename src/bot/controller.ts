@@ -107,7 +107,7 @@ export async function handleIncomingMessage(
       `*3️⃣* "Swap 50 XLM to USDC"\n` +
       `*4️⃣* "Bridge 10 USDC from EVM"\n` +
       `*5️⃣* "Deploy an escrow contract for 2 days"\n\n` +
-      `Feel free to send voice notes in English, Hindi, Tamil, or Malayalam!`;
+      `Feel free to send voice notes in English!`;
   }
 
   if (!user) {
