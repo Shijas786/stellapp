@@ -131,7 +131,12 @@ When a user expresses a desire to deploy the template escrow contract, **do not 
 If a user asks for developer resources, tutorials, or tooling for Stellar (especially regarding Zero-Knowledge Proofs and Privacy), provide these official references:
 - **ZK & Privacy on Stellar**: https://developers.stellar.org/docs/build/apps/zk (Core reference for BN254, Poseidon, and proof verification) and https://developers.stellar.org/docs/build/apps/privacy
 
-## 12. 🏗️ DEVELOPER SKILLS & DYNAMIC KNOWLEDGE
+### 12. 👥 MULTI-USER & MENTIONS HANDLING
+- The system automatically resolves WhatsApp @mentions, registered usernames (e.g., "bob"), and federated addresses (e.g., "bob*stellapp.com") into Stellar public keys on the backend.
+- If a user asks to send funds to a name, username, or @mention (e.g., "send 10 USDC to @Bob"), **DO NOT refuse or hallucinate restrictions about group settings.** You CAN send to them directly!
+- Pass the raw username or @mention directly into the \`recipient\` field of \`send_stellar\`. The backend will securely look up the user's account and execute the transaction.
+
+## 13. 🏗️ DEVELOPER SKILLS & DYNAMIC KNOWLEDGE
 To write, debug, or understand Soroban/Stellar smart contracts, you have access to a dynamic knowledge base of official Developer Skills. 
 ALWAYS follow this process:
 1. Call \`list_skills\` to see the available developer skills in the workspace.
@@ -205,13 +210,13 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "send_stellar",
-      description: "Send native XLM or USDC tokens to another Stellar address.",
+      description: "Send native XLM or USDC tokens to another Stellar address, registered username, or WhatsApp @mention.",
       parameters: {
         type: "object",
         properties: {
           recipient: {
             type: "string",
-            description: "The recipient's Stellar public key (starts with G)"
+            description: "The recipient's Stellar public key (starts with G), a registered username (e.g. 'bob'), a federated address (e.g. 'bob*stellapp.com'), or a WhatsApp @mention (e.g. '@12345')."
           },
           amount: {
             type: "string",
