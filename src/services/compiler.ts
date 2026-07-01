@@ -15,6 +15,13 @@ export function compileRustContract(rustCode: string): Buffer {
   const libPath = path.join(COMPILER_DIR, "src/lib.rs");
   fs.writeFileSync(libPath, rustCode);
 
+  console.log("[Compiler] Cleaning target directory to invalidate cache...");
+  try {
+    execSync("cargo clean", { cwd: COMPILER_DIR });
+  } catch (error: any) {
+    console.warn("[Compiler] Warning: cargo clean failed:", error.message);
+  }
+
   console.log("[Compiler] Executing Cargo build target wasm32-unknown-unknown...");
   try {
     // Run cargo build synchronously. Disable reference-types and multi-value features which are unsupported by Soroban VM validator.
