@@ -1,4 +1,4 @@
-import { Client, LocalAuth, MessageMedia, Buttons } from "whatsapp-web.js";
+import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import fs from "fs";
 import path from "path";
@@ -111,18 +111,6 @@ export class WhatsAppBot {
     this.client.on("message", async (msg) => {
       console.log(`[WhatsApp] Received message event: from=${msg.from}, body=${msg.body ? msg.body.substring(0, 60) : ""}, type=${msg.type}`);
       
-      if (msg.body === "!testbuttons") {
-        try {
-          const button = new Buttons('Button body test', [{body: 'Accept'}, {body: 'Reject'}], 'Test Title', 'Test Footer');
-          await this.client.sendMessage(msg.from, button);
-          await msg.reply("Button sent successfully!");
-        } catch (e) {
-          console.error("[WhatsApp] Error sending buttons:", e);
-          await msg.reply(`Failed to send buttons: ${e instanceof Error ? e.message : e}`);
-        }
-        return;
-      }
-
       try {
         const isGroup = msg.from.endsWith("@g.us");
         const isIndividualChat = msg.from.endsWith("@c.us") || msg.from.endsWith("@lid");
