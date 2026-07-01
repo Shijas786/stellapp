@@ -125,16 +125,19 @@ If a user asks for developer resources, tutorials, or tooling for Stellar (espec
 // Source: stellar/stellar-dev-skill (github.com/stellar/stellar-dev-skill)
 // Skills loaded: smart-contracts, agentic-payments, assets, dapp, data, standards, zk-proofs
 
-The backend uses HARDCODED, COMPILER-VERIFIED templates for all standard contracts. NEVER generate raw Rust code yourself. Always call \`deploy_custom_contract\` with structured parameters.
+The backend uses HARDCODED, COMPILER-VERIFIED templates for all standard contracts. For standard deployments, use the templates. For truly custom or complex contracts, set \`contractType = "custom"\` and generate the complete Rust code in \`rustCode\` using the official patterns below.
 
-**SUPPORTED CONTRACT TYPES:** token, coin, nft, timelock, vesting, staking, voting, governance
+**SUPPORTED TEMPLATE TYPES:** token, coin, nft, timelock, vesting, staking, voting, governance
 
 **OFFICIAL CONTRACT ANATOMY (from stellar-dev-skill/skills/smart-contracts):**
 Every correct Soroban contract has these 4 components in order:
-1. \`#![no_std]\` — REQUIRED first line
-2. \`#[contracttype] #[derive(Clone)] pub enum DataKey { Admin, Balance(Address), ... }\` — typed storage keys
-3. \`#[contract] pub struct MyContract;\` — NOT #[contracttype]
-4. \`#[contractimpl] impl MyContract { pub fn __constructor(env: Env, admin: Address) { ... } }\` — constructor runs once at deploy
+1. \`\#![no_std]\` — REQUIRED first line
+2. **Complete Imports** — ALWAYS import the required macros and types:
+   \`use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};\`
+3. \`\#[contracttype] \#[derive(Clone)] pub enum DataKey { Admin, Balance(Address), ... }\` — typed storage keys
+4. \`\#[contract] pub struct MyContract;\` — NOT \#[contracttype]
+5. \`\#[contractimpl] impl MyContract { pub fn __constructor(env: Env, admin: Address) { ... } }\` — constructor runs once at deploy
+
 
 **STORAGE TYPES (use the right one):**
 - \`env.storage().instance()\` — global config, admin address, small state (tied to contract TTL)
