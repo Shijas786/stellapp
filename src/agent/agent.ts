@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { SYSTEM_PROMPT, OPENAI_TOOLS } from "./prompt";
 import { executeTool, UserWalletData } from "./tools";
 import { config } from "../services/config";
+import { prisma } from "../services/db";
 import fs from "fs";
 import dotenv from "dotenv";
 
@@ -37,16 +38,26 @@ export async function runAgentLoop(
 ): Promise<string> {
   let history = chatHistories.get(chatId);
 
-  // 1. Initialize history with formatted system prompt if first message
-  if (!history) {
-    const formattedSystemPrompt = SYSTEM_PROMPT
-      .replace("{{stellarPublic}}", user.stellarPublic)
-      .replace("{{evmAddress}}", user.evmAddress);
+  // Fetch saved contacts for this user dynamically on every turn
+  const contacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
+  const contactsList = contacts.length > 0 
+    ? contacts.map(c => `- ${c.name}: ${c.phoneNumber}`).join("\n") 
+    : "No saved contacts yet.";
 
+  // 1. Initialize or update history with formatted system prompt
+  const formattedSystemPrompt = SYSTEM_PROMPT
+    .replace("{{stellarPublic}}", user.stellarPublic)
+    .replace("{{evmAddress}}", user.evmAddress)
+    .replace("{{savedContacts}}", contactsList);
+
+  if (!history) {
     history = [
       { role: "system", content: formattedSystemPrompt }
     ];
     chatHistories.set(chatId, history);
+  } else {
+    // Overwrite the first message (system prompt) to ensure freshness of contacts
+    history[0].content = formattedSystemPrompt;
   }
 
   // 2. Add new user query

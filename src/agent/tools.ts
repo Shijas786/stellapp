@@ -371,6 +371,33 @@ export async function executeTool(
       });
     }
 
+    case "save_contact": {
+      const { name, phoneNumber } = args;
+      
+      // Upsert the contact to avoid unique constraint errors
+      await prisma.contact.upsert({
+        where: {
+          ownerId_name: {
+            ownerId: user.id,
+            name: name.toLowerCase() // store in lowercase for easy matching
+          }
+        },
+        update: {
+          phoneNumber
+        },
+        create: {
+          ownerId: user.id,
+          name: name.toLowerCase(),
+          phoneNumber
+        }
+      });
+
+      return {
+        success: true,
+        message: `Successfully saved ${name} with phone number ${phoneNumber} to contacts.`
+      };
+    }
+
     case "read_skill": {
       const skillName = args.skillName;
       if (!skillName || typeof skillName !== "string") {

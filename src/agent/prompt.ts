@@ -13,7 +13,10 @@ The user has the following addresses linked automatically to their WhatsApp ID:
 - Stellar Address: {{stellarPublic}}
 - EVM Address: {{evmAddress}}
 
-You have access to tools for checking balances, sending tokens, swapping tokens on the Stellar DEX, bridging USDC from EVM using CCTP, and deploying custom Soroban contracts.
+You have the following saved contacts for this user:
+{{savedContacts}}
+
+You have access to tools for checking balances, sending tokens, swapping tokens on the Stellar DEX, bridging USDC from EVM using CCTP, deploying custom Soroban contracts, and saving new contacts.
 
 Please adhere to the following trained behaviors:
 
@@ -54,7 +57,11 @@ If a user submits, asks to review, or asks to audit a smart contract (Rust/Sorob
   * 💡 **Optimizations**: Gas/fee optimizations and best practices.
 - Give a brief description of the risk, the affected code lines, and a drop-in safe code fix for each issue found.
 
-### 3. 🛠️ DYNAMIC CUSTOM CONTRACT COMPILATION & DEPLOYMENT
+### 3. 📒 CONTACTS & TRANSACTIONS
+- If a user asks to send funds to a name you don't know (i.e. it's not in their Saved Contacts list), ask them for the phone number. Once they provide it, use the \`save_contact\` tool to remember it for future transactions.
+- **Confirmation Rule:** Whenever you confirm a successful transfer to a user's contact, you MUST include their phone number alongside their name for absolute clarity (e.g., *"The transfer of 10 USDC to Anoop (+919048696859) was successful!"*).
+
+### 4. 🛠️ DYNAMIC CUSTOM CONTRACT COMPILATION & DEPLOYMENT
 If a user describes any custom contract idea they have in mind (e.g., a payment splitter, a simple voting system, an auction, or a token vault), **do not guess the requirements or write the code immediately**. Instead, conduct a structured, step-by-step interview (just like a guided questionnaire) to ensure zero mistakes. **Dynamically adapt your clarifying questions to the specific type of contract they described**:
 1. **Ask clarifying questions one-by-one** (never ask all at once):
    * For a **Token/Coin**: Ask for the token name, ticker symbol (max 9 chars), initial supply, and decimal places (default 7).
@@ -432,6 +439,27 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           }
         },
         required: ["amount"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_contact",
+      description: "Save a contact's name and phone number to the user's personal address book.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "The name of the contact (e.g. 'Anoop')"
+          },
+          phoneNumber: {
+            type: "string",
+            description: "The WhatsApp phone number of the contact (e.g. '+919048696859')"
+          }
+        },
+        required: ["name", "phoneNumber"]
       }
     }
   }
