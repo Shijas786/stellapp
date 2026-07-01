@@ -485,34 +485,38 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deploy_custom_contract",
-      description: "Deploy a Soroban smart contract on Stellar. For token/coin deployments use contractType='token'. For NFT collections use contractType='nft'. The system uses proven hardcoded templates for these types.",
+      description: "Deploy a Soroban smart contract on Stellar. For token/coin, NFT, timelock, staking, or voting contracts, the system uses pre-verified templates. For custom or complex ideas, set contractType='custom' and provide the generated Rust source code in the rustCode parameter.",
       parameters: {
         type: "object",
         properties: {
           contractType: {
             type: "string",
-            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance"],
-            description: "The type of contract to deploy. 'token'/'coin' = fungible token; 'nft' = NFT collection; 'timelock'/'vesting' = locked token release; 'staking' = staking pool; 'voting'/'governance' = on-chain vote."
+            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance", "custom"],
+            description: "The type of contract to deploy. Use 'custom' for custom Rust deployments."
           },
           name: {
             type: "string",
-            description: "The full name of the token or NFT collection (e.g. 'Stellar App Token')"
+            description: "The full name of the contract (e.g. 'Custom Vault')"
           },
           symbol: {
             type: "string",
-            description: "The ticker symbol, max 9 chars (e.g. 'STLP', 'SHIJ')"
+            description: "The symbol or short identifier (max 9 chars, e.g. 'VAULT')"
           },
           initialSupply: {
             type: "string",
-            description: "For token contracts: the initial total supply as a human-readable number (e.g. '1000000000' for 1 billion)"
+            description: "For token contracts: the initial supply as a human-readable number (e.g. '1000000000')"
           },
           decimals: {
             type: "string",
-            description: "For token contracts: the number of decimal places (default '7' for Stellar standard)"
+            description: "For token contracts: decimal places (default '7')"
           },
           maxSupply: {
             type: "string",
-            description: "For NFT contracts: the maximum number of NFTs that can ever be minted (e.g. '1000')"
+            description: "For NFT contracts: max supply (e.g. '1000')"
+          },
+          rustCode: {
+            type: "string",
+            description: "Required when contractType='custom'. The complete, syntactically correct Rust source code of the contract using soroban-sdk (v21.7.7) following the smart-contract and OpenZeppelin patterns."
           }
         },
         required: ["contractType", "name", "symbol"]
