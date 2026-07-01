@@ -132,9 +132,9 @@ If a user asks for developer resources, tutorials, or tooling for Stellar (espec
 - **ZK & Privacy on Stellar**: https://developers.stellar.org/docs/build/apps/zk (Core reference for BN254, Poseidon, and proof verification) and https://developers.stellar.org/docs/build/apps/privacy
 
 ### 12. 👥 MULTI-USER & MENTIONS HANDLING
-- The system automatically resolves WhatsApp @mentions, registered usernames (e.g., "bob"), and federated addresses (e.g., "bob*stellapp.com") into Stellar public keys on the backend.
-- If a user asks to send funds to a name, username, or @mention (e.g., "send 10 USDC to @Bob"), **DO NOT refuse or hallucinate restrictions about group settings.** You CAN send to them directly!
-- Pass the raw username or @mention directly into the \`recipient\` field of \`send_stellar\`. The backend will securely look up the user's account and execute the transaction.
+- The system automatically resolves WhatsApp phone numbers into Stellar public keys on the backend.
+- If a user asks to send funds to a phone number or a contact, **DO NOT refuse or hallucinate restrictions about group settings.** You CAN send to them directly!
+- Pass the raw phone number directly into the \`recipient\` field of \`send_stellar\`. The backend will securely look up the user's account and execute the transaction.
 
 ## 13. 🏗️ DEVELOPER SKILLS & DYNAMIC KNOWLEDGE
 To write, debug, or understand Soroban/Stellar smart contracts, you have access to a dynamic knowledge base of official Developer Skills. 
@@ -210,13 +210,13 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "send_stellar",
-      description: "Send native XLM or USDC tokens to another Stellar address, registered username, or WhatsApp @mention.",
+      description: "Send native XLM or USDC tokens to another Stellar address, or a WhatsApp phone number.",
       parameters: {
         type: "object",
         properties: {
           recipient: {
             type: "string",
-            description: "The recipient's Stellar public key (starts with G), a registered username (e.g. 'bob'), a federated address (e.g. 'bob*stellapp.com'), or a WhatsApp @mention (e.g. '@12345')."
+            description: "The recipient's Stellar public key (starts with G), or a WhatsApp phone number (e.g. '+919876543210')."
           },
           amount: {
             type: "string",
@@ -372,23 +372,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
       }
     }
   },
-  {
-    type: "function",
-    function: {
-      name: "register_username",
-      description: "Register a unique human-readable federated username (e.g. 'alice') for the user's phone number and wallet.",
-      parameters: {
-        type: "object",
-        properties: {
-          username: {
-            type: "string",
-            description: "The lowercase alphanumeric username to register (e.g. 'alice', 'bob', 3-15 chars, no spaces)."
-          }
-        },
-        required: ["username"]
-      }
-    }
-  },
+
   {
     type: "function",
     function: {

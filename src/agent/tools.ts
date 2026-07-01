@@ -543,16 +543,7 @@ export async function executeTool(
           console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolved.stellarPublic}`);
           recipient = resolved.stellarPublic;
         } else {
-          console.log(`[Tools] Recipient is a username. Resolving: ${recipient}`);
-          const username = recipient.split("*")[0].toLowerCase();
-          const resolved = await prisma.user.findUnique({
-            where: { username }
-          });
-          if (!resolved) {
-            throw new Error(`Username '${recipient}' could not be resolved to any active Stellar wallet.`);
-          }
-          console.log(`[Tools] Resolved username '${username}' to public address: ${resolved.stellarPublic}`);
-          recipient = resolved.stellarPublic;
+          throw new Error(`Recipient '${recipient}' is not a valid Stellar address (G...) or phone number.`);
         }
       }
 
@@ -643,6 +634,7 @@ export async function executeTool(
     }
 
     case "deploy_escrow_contract": {
+      await sendNotification(chatId, "⏳ *Deploying Escrow Contract...*\n\nThis involves compiling the Rust smart contract to WASM and deploying it to the Stellar network. It usually takes 30-45 seconds. Please wait!");
       const stellarSecret = decrypt(user.stellarSecret);
       const { contractId, txHash } = await stellar.deployEscrowContract(
         stellarSecret,
@@ -685,6 +677,7 @@ export async function executeTool(
     }
 
     case "deploy_custom_contract": {
+      await sendNotification(chatId, "⏳ *Compiling & Deploying Custom Contract...*\n\nThis involves writing the Rust smart contract, compiling it to WASM, and deploying it to the Stellar network. It usually takes 45-60 seconds. Please wait!");
       const stellarSecret = decrypt(user.stellarSecret);
       const contractType: string = (args.contractType || "custom").toLowerCase();
 
@@ -801,32 +794,8 @@ export async function executeTool(
       };
     }
 
-    case "register_username": {
-      const username = args.username.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (username.length < 3 || username.length > 15) {
-        throw new Error("Username must be between 3 and 15 alphanumeric characters.");
-      }
-
-      const existing = await prisma.user.findFirst({
-        where: { username }
-      });
-      if (existing) {
-        throw new Error(`Username '${username}' is already taken.`);
-      }
-
-      await prisma.user.update({
-        where: { chatId },
-        data: { username }
-      });
-
-      return {
-        success: true,
-        username,
-        federatedAddress: `${username}*stellapp.com`
-      };
-    }
-
     case "deploy_privacy_pool": {
+      await sendNotification(chatId, "⏳ *Deploying ZK Privacy Pool...*\n\nThis involves deploying the Zero-Knowledge verifier and the privacy pool to the Stellar network. It usually takes 30-45 seconds. Please wait!");
       const stellarSecret = decrypt(user.stellarSecret);
       const { contractId, txHash } = await stellar.deployPrivacyPool(stellarSecret);
 

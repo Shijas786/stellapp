@@ -193,7 +193,25 @@ export class WhatsAppBot {
           console.error("Failed to retrieve contact name:", err.message);
         }
 
+        let chat;
+        try {
+          chat = await msg.getChat();
+          if (isVoice) {
+            await chat.sendStateRecording();
+          } else {
+            await chat.sendStateTyping();
+          }
+        } catch (err: any) {
+          console.error("Failed to set chat state:", err.message);
+        }
+
         let response = await handleIncomingMessage(senderId, text, contactName);
+        
+        if (chat) {
+          try {
+            await chat.clearState();
+          } catch (e) {}
+        }
         
         if (response) {
           let textToReply = response;
@@ -207,6 +225,9 @@ export class WhatsAppBot {
           // If the user messaged us via voice, we talk back to them!
           if (isVoice) {
             try {
+              if (chat) {
+                await chat.sendStateRecording();
+              }
               console.log(`[WhatsApp] Generating voice message reply for ${msg.from}...`);
               const tempSpeechPath = path.join(os.tmpdir(), `speech-${Date.now()}.mp3`);
               
@@ -226,8 +247,18 @@ export class WhatsAppBot {
               } catch (e) {
                 console.error("Failed to delete temp speech file:", e);
               }
+              if (chat) {
+                try {
+                  await chat.clearState();
+                } catch (e) {}
+              }
             } catch (ttsError: any) {
               console.error("[WhatsApp] Failed to generate and send voice note response:", ttsError.message);
+              if (chat) {
+                try {
+                  await chat.clearState();
+                } catch (e) {}
+              }
             }
           }
         }
