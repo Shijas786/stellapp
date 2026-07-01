@@ -685,6 +685,16 @@ export async function executeTool(
         // For truly custom contracts, use AI-provided code
         rustCode = args.rustCode || "";
         if (!rustCode) throw new Error("rustCode is required for custom contracts.");
+        
+        // Safety net: if AI forgot the #![no_std] directive, inject it
+        if (!rustCode.includes("#![no_std]")) {
+          rustCode = "#![no_std]\n" + rustCode;
+        }
+        
+        // Safety net: if AI forgot the imports completely, inject standard ones
+        if (!rustCode.includes("use soroban_sdk")) {
+          rustCode = rustCode.replace("#![no_std]", "#![no_std]\nuse soroban_sdk::{contract, contractimpl, contracttype, contracterror, Address, Env, Vec, String, Map, Symbol, symbol_short, token};\n");
+        }
       }
 
       // 1. Compile chosen template to WASM
