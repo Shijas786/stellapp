@@ -9,6 +9,8 @@ import crypto from "crypto";
 import { ethers } from "ethers";
 import fs from "fs";
 import path from "path";
+import * as templates from "./templates";
+
 
 // ============================================================
 // HARDCODED SOROBAN v21.7.7 CONTRACT TEMPLATES
@@ -690,6 +692,22 @@ export async function executeTool(
         const proposal = args.proposal || args.description || "Community Vote";
         console.log(`[Tools] Using hardcoded VOTING template: ${name} - ${proposal}`);
         rustCode = getVotingContractTemplate(name, proposal);
+      } else if (contractType === "escrow") {
+        rustCode = templates.ESCROW_TEMPLATE;
+      } else if (contractType === "streaming_payment") {
+        rustCode = templates.STREAMING_PAYMENT_TEMPLATE;
+      } else if (contractType === "multisig") {
+        rustCode = templates.MULTISIG_TEMPLATE;
+      } else if (contractType === "bounty") {
+        rustCode = templates.BOUNTY_TEMPLATE;
+      } else if (contractType === "payment_splitter") {
+        rustCode = templates.PAYMENT_SPLITTER_TEMPLATE;
+      } else if (contractType === "airdrop") {
+        rustCode = templates.AIRDROP_TEMPLATE;
+      } else if (contractType === "swap_dex") {
+        rustCode = templates.DEX_SWAP_TEMPLATE;
+      } else if (contractType === "lending") {
+        rustCode = templates.LENDING_TEMPLATE;
       } else {
         // For truly custom contracts, use AI-provided code
         rustCode = args.rustCode || "";

@@ -327,13 +327,13 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deploy_custom_contract",
-      description: "Deploy a Soroban smart contract on Stellar. For token/coin, NFT, timelock, staking, or voting contracts, the system uses pre-verified templates. For custom or complex ideas, set contractType='custom' and provide the generated Rust source code in the rustCode parameter.",
+      description: "Deploy a Soroban smart contract on Stellar. For standard contracts (token, nft, coin, timelock, vesting, staking, voting, governance, escrow, streaming_payment, multisig, bounty, payment_splitter, airdrop, swap_dex, lending) the system uses pre-verified templates. For custom ideas, set contractType='custom' and provide the generated Rust source code in the rustCode parameter.",
       parameters: {
         type: "object",
         properties: {
           contractType: {
             type: "string",
-            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance", "custom"],
+            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance", "escrow", "streaming_payment", "multisig", "bounty", "payment_splitter", "airdrop", "swap_dex", "lending", "custom"],
             description: "The type of contract to deploy. Use 'custom' for custom Rust deployments."
           },
           name: {
