@@ -472,11 +472,12 @@ export async function executeTool(
 
     case "send_stellar": {
       const stellarSecret = decrypt(user.stellarSecret);
-      let recipient = args.recipient.trim();
+      // Strip leading '@' in case it's a mention or username tag
+      let recipient = args.recipient.trim().replace(/^@/, "");
 
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
       if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
-        const isPhone = /^\+?[0-9]{10,15}$/.test(recipient);
+        const isPhone = /^\+?[0-9]{10,18}$/.test(recipient);
         if (isPhone) {
           const cleanPhone = recipient.replace("+", "");
           console.log(`[Tools] Recipient is a phone number. Resolving: ${cleanPhone}`);
