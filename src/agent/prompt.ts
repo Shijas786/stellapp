@@ -120,11 +120,12 @@ If a user asks for developer resources, tutorials, or tooling for Stellar (espec
 ## Writing Soroban Smart Contracts (v21.7.7)
 When the user asks you to write and deploy a custom smart contract via \`deploy_custom_contract\`, you MUST use the modern Soroban SDK v21.7.7 syntax. The rust compiler will fail if you use old v0.x syntax!
 CRITICAL RULES FOR RUST CODE:
-1. **Structs & Types:** DO NOT manually implement \`IntoVal\` or \`TryFromVal\` for structs. Instead, just use the \`#[contracttype]\` macro. Example: \`#[contracttype] #[derive(Clone, Debug)] pub struct Nft { ... }\`.
+1. **Structs & Types:** DO NOT manually implement \`IntoVal\` or \`TryFromVal\` for structs. Use the \`#[contracttype]\` macro for data types. Example: \`#[contracttype] #[derive(Clone, Debug)] pub struct Nft { ... }\`.
 2. **Authentication:** DO NOT use \`env.invoker()\`. To check auth, require the caller's address as a function parameter and call \`.require_auth()\`. Example: \`pub fn mint(env: Env, caller: Address) { caller.require_auth(); ... }\`.
 3. **Symbols:** Use the \`symbol_short!("name")\` macro for keys up to 9 chars. If using \`Symbol::new\`, you MUST pass a reference to the env: \`Symbol::new(&env, "long_name_here")\`.
 4. **Storage:** Use \`env.storage().instance().set(&key, &value)\` and \`.get(&key)\`.
-5. **Errors:** Use \#[contracterror] for error enums, do not return string slices as errors. Example: \`#[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)] pub enum Error { NotAuthorized = 1 }\`. Returning \`Result<T, Error>\` is preferred.
+5. **Errors:** Use \`#[contracterror]\` for error enums, do not return string slices as errors.
+6. **Contract Declaration:** The main contract struct MUST have the \`#[contract]\` macro. Do NOT put \`#[contracttype]\` on the main contract struct. Example: \`#[contract] pub struct MyContract;\` followed by \`#[contractimpl] impl MyContract { ... }\`.
 
 - **AI Dev Skills**: https://skills.stellar.org/ (Agent-readable docs for building on Stellar)
 - **On-Chain ZK Verifier Implementations**:
