@@ -524,17 +524,17 @@ export async function executeTool(
             // On mainnet: skip trustline — account has no XLM yet, sender's USDC will arrive via path payment
           }
 
-          // Notify the unregistered recipient via WhatsApp
-          try {
-            await sendNotification(
-              `${cleanPhone}@c.us`,
-              `💸 *You've received a payment!*\n\nSomeone sent you tokens on Stellar via Stellapp Bot.\n\n` +
-              `Your wallet address: \`${resolved.stellarPublic}\`\n\n` +
-              `Text me *"What's my balance?"* to check your balance, or *"activate my account"* if you're on Mainnet!`
-            );
-          } catch {
-            // Non-critical — recipient notification failure shouldn't block the send
-          }
+          // Notification block removed per user request
+          // try {
+          //   await sendNotification(
+          //     `${cleanPhone}@c.us`,
+          //     `💸 *You've received a payment!*\n\nSomeone sent you tokens on Stellar via Stellapp Bot.\n\n` +
+          //     `Your wallet address: \`${resolved.stellarPublic}\`\n\n` +
+          //     `Text me *"What's my balance?"* to check your balance, or *"activate my account"* if you're on Mainnet!`
+          //   );
+          // } catch {
+          //   // Non-critical
+          // }
 
           console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolved.stellarPublic}`);
           recipient = resolved.stellarPublic;
