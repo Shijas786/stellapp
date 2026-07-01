@@ -102,20 +102,14 @@ export async function handleIncomingMessage(
       ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*stellapp.com\`)\n\n`
       : "";
 
-    return `👋 *Welcome to Stellapp - Your AI Crypto Assistant!* 🚀\n\n` +
-      `Stellapp lets you manage your crypto directly from WhatsApp. You can send payments, swap tokens, bridge between networks, and even deploy smart contracts simply by chatting with me.\n\n` +
-      `To get you started, I've securely created dedicated Stellar and EVM wallets linked to your phone number.\n\n` +
-      `✨ *Your Stellar Address (${networkNameStellar}):*\n\`${user.stellarPublic}\`\n\n` +
-      `⛓️ *Your EVM Address (${networkNameEVM}):*\n\`${user.evmAddress}\`\n\n` +
+    return `👋 *Welcome to Stellapp!* 🚀\n\n` +
+      `Your personal crypto wallet, right inside WhatsApp. You can send payments, swap tokens, and bridge between networks just by texting or sending a voice note. 🎙️\n\n` +
+      `I've securely generated your wallets:\n\n` +
+      `✨ *Stellar (${networkNameStellar}):*\n\`${user.stellarPublic}\`\n\n` +
+      `⛓️ *EVM (${networkNameEVM}):*\n\`${user.evmAddress}\`\n\n` +
       usernameStatus +
       `${fundingStatus}\n\n` +
-      `💡 *Here's what you can try (Reply with 1, 2, 3, 4, or 5):*\n` +
-      `*1️⃣* "What's my balance?"\n` +
-      `*2️⃣* "Send 10 USDC to John"\n` +
-      `*3️⃣* "Swap 50 XLM to USDC"\n` +
-      `*4️⃣* "Bridge 10 USDC from EVM"\n` +
-      `*5️⃣* "Deploy an escrow contract for 2 days"\n\n` +
-      `Feel free to send voice notes in English!`;
+      `💡 *Try sending:* "What's my balance?" or "Send 10 USDC to John"`;
   }
 
   if (!user) {
