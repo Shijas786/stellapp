@@ -103,13 +103,13 @@ export async function handleIncomingMessage(
       : "";
 
     return `👋 *Welcome to Stellapp!* 🚀\n\n` +
-      `Your personal crypto wallet, right inside WhatsApp. You can send payments, swap tokens, and bridge between networks just by texting or sending a voice note. 🎙️\n\n` +
+      `Your personal crypto wallet, right inside WhatsApp. You can send payments, swap tokens, bridge between networks, and even deploy smart contracts just by texting or sending a voice note. 🎙️\n\n` +
       `I've securely generated your wallets:\n\n` +
       `✨ *Stellar (${networkNameStellar}):*\n\`${user.stellarPublic}\`\n\n` +
       `⛓️ *EVM (${networkNameEVM}):*\n\`${user.evmAddress}\`\n\n` +
       usernameStatus +
       `${fundingStatus}\n\n` +
-      `💡 *Try sending:* "What's my balance?" or "Send 10 USDC to John"`;
+      `💡 *Try sending:* "What's my balance?", "Send 10 USDC to John", or "Deploy an escrow contract for 2 days"`;
   }
 
   if (!user) {
