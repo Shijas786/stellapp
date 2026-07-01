@@ -505,6 +505,9 @@ export async function executeTool(
       // Strip leading '@' in case it's a mention or username tag
       let recipient = args.recipient.trim().replace(/^@/, "");
 
+      let isGhostOnboardedOnMainnet = false;
+      let ghostSecret = "";
+
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
       if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
         const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
@@ -544,28 +547,17 @@ export async function executeTool(
               }
             });
 
-            // 4. Fund Stellar account (testnet only — mainnet requires user to send XLM first)
+            // 4. Fund Stellar account
             if (!config.isMainnet) {
-              console.log(`[Tools] Funding pre-created account: ${newStellar.publicKey}`);
+              console.log(`[Tools] Funding pre-created account on testnet: ${newStellar.publicKey}`);
               await stellar.fundStellarAccount(newStellar.publicKey);
-              // Trustline only after account is funded (requires XLM for fee)
               console.log(`[Tools] Establishing USDC trustline for pre-created account...`);
               await stellar.ensureUSDCTrustline(newStellar.secretKey);
+            } else {
+              isGhostOnboardedOnMainnet = true;
+              ghostSecret = newStellar.secretKey;
             }
-            // On mainnet: skip trustline — account has no XLM yet, sender's USDC will arrive via path payment
           }
-
-          // Notification block removed per user request
-          // try {
-          //   await sendNotification(
-          //     `${cleanPhone}@c.us`,
-          //     `💸 *You've received a payment!*\n\nSomeone sent you tokens on Stellar via Stellapp Bot.\n\n` +
-          //     `Your wallet address: \`${resolved.stellarPublic}\`\n\n` +
-          //     `Text me *"What's my balance?"* to check your balance, or *"activate my account"* if you're on Mainnet!`
-          //   );
-          // } catch {
-          //   // Non-critical
-          // }
 
           console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolved.stellarPublic}`);
           recipient = resolved.stellarPublic;
@@ -575,23 +567,37 @@ export async function executeTool(
       }
 
       const isUSDC = args.asset === "USDC";
+      let txHash = "";
 
-      if (isUSDC) {
-        // Verify recipient has USDC trustline
-        const hasTrust = await stellar.checkRecipientUSDCTrustline(recipient);
-        if (!hasTrust) {
-          throw new Error(
-            `Recipient address ${recipient} does not have a USDC trustline. Ask them to establish a trustline for USDC before sending.`
-          );
+      if (isGhostOnboardedOnMainnet) {
+        // Mainnet Ghost-Onboarding: Sender atomically pays 2.5 XLM to create the account, 
+        // establishes the trustline (if USDC), and sends the tokens all in one tx.
+        console.log(`[Tools] Initiating Atomic Sponsorship on Mainnet for ${recipient}`);
+        txHash = await stellar.atomicSponsorAndSend(
+          stellarSecret,
+          ghostSecret,
+          args.amount,
+          isUSDC
+        );
+      } else {
+        // Standard payment flow
+        if (isUSDC) {
+          // Verify recipient has USDC trustline
+          const hasTrust = await stellar.checkRecipientUSDCTrustline(recipient);
+          if (!hasTrust) {
+            throw new Error(
+              `Recipient address ${recipient} does not have a USDC trustline. Ask them to establish a trustline for USDC before sending.`
+            );
+          }
         }
-      }
 
-      const txHash = await stellar.sendStellarToken(
-        stellarSecret,
-        recipient,
-        args.amount,
-        isUSDC
-      );
+        txHash = await stellar.sendStellarToken(
+          stellarSecret,
+          recipient,
+          args.amount,
+          isUSDC
+        );
+      }
 
       return {
         success: true,

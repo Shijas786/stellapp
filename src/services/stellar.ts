@@ -240,6 +240,63 @@ export async function sendStellarToken(
 }
 
 /**
+ * Atomically creates a recipient account, establishes a USDC trustline (if needed), 
+ * and sends tokens in a single transaction (Sponsored by the sender).
+ */
+export async function atomicSponsorAndSend(
+  senderSecret: string,
+  recipientSecret: string,
+  amount: string,
+  sendUSDC: boolean = false
+): Promise<string> {
+  const senderKeypair = Keypair.fromSecret(senderSecret);
+  const recipientKeypair = Keypair.fromSecret(recipientSecret);
+  
+  const senderAccount = await horizonServer.loadAccount(senderKeypair.publicKey());
+
+  let txBuilder = new TransactionBuilder(senderAccount, {
+    fee: (parseInt(BASE_FEE) * 3).toString(),
+    networkPassphrase: PASSPHRASE
+  })
+    // 1. Create the new account (costs 2.5 XLM from sender)
+    .addOperation(
+      Operation.createAccount({
+        destination: recipientKeypair.publicKey(),
+        startingBalance: "2.5", // Covers base reserve (1 XLM) + 1 trustline (0.5 XLM) + fees
+      })
+    );
+
+  if (sendUSDC) {
+    // 2. Establish USDC trustline for the recipient (Source: recipient)
+    txBuilder.addOperation(
+      Operation.changeTrust({
+        asset: USDC_ASSET,
+        source: recipientKeypair.publicKey()
+      })
+    );
+  }
+
+  const asset = sendUSDC ? USDC_ASSET : Asset.native();
+
+  // 3. Send the payment (Source: sender)
+  txBuilder.addOperation(
+    Operation.payment({
+      destination: recipientKeypair.publicKey(),
+      asset: asset,
+      amount: amount,
+    })
+  );
+
+  const tx = txBuilder.setTimeout(30).build();
+
+  // Sign with BOTH the sender and the recipient
+  tx.sign(senderKeypair, recipientKeypair);
+  
+  const result = await horizonServer.submitTransaction(tx);
+  return result.hash;
+}
+
+/**
  * Swaps XLM to USDC or USDC to XLM using Path Payments.
  */
 export async function swapTokens(
