@@ -372,34 +372,43 @@ export async function executeTool(
         return "Error: skillName must be a string.";
       }
 
-      // 1. Regex validation (Belt)
-      if (!/^[a-z0-9-_]+$/i.test(skillName)) {
+      // 1. Regex validation: allow alphanumeric, dashes, underscores, and periods (for .md)
+      if (!/^[a-z0-9-_\.]+$/i.test(skillName)) {
         return `Error: Invalid skillName format "${skillName}".`;
       }
 
       const skillsDir = path.join(process.cwd(), ".agents/skills");
       if (!fs.existsSync(skillsDir)) return "No skills directory found.";
 
-      // 2. Whitelist validation (Suspenders)
-      const validSkills = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name);
+      // 2. Resolve the file
+      let targetPath = "";
 
-      if (!validSkills.includes(skillName)) {
-        return `Skill "${skillName}" not found. Available skills: ${validSkills.join(", ")}`;
+      // Try exact match as a directory first
+      const exactDirPath = path.join(skillsDir, skillName);
+      if (fs.existsSync(exactDirPath) && fs.statSync(exactDirPath).isDirectory()) {
+         targetPath = path.join(exactDirPath, "SKILL.md");
+      } else {
+         // It might be a sub-file like "development.md". Search all skill directories for it.
+         const dirs = fs.readdirSync(skillsDir, { withFileTypes: true }).filter(d => d.isDirectory());
+         for (const d of dirs) {
+            const possiblePath = path.join(skillsDir, d.name, skillName);
+            if (fs.existsSync(possiblePath) && fs.statSync(possiblePath).isFile()) {
+               targetPath = possiblePath;
+               break;
+            }
+         }
+      }
+
+      if (!targetPath || !fs.existsSync(targetPath)) {
+         return `Skill or file "${skillName}" not found.`;
       }
 
       // 3. Path traversal defense-in-depth
-      const filePath = path.join(skillsDir, skillName, "SKILL.md");
-      if (!filePath.startsWith(skillsDir)) {
+      if (!targetPath.startsWith(skillsDir)) {
         return "Error: Path traversal detected.";
       }
 
-      if (!fs.existsSync(filePath)) {
-        return `Skill "${skillName}" directory exists, but is missing SKILL.md.`;
-      }
-
-      return fs.readFileSync(filePath, "utf-8");
+      return fs.readFileSync(targetPath, "utf-8");
     }
 
     case "get_balances": {
