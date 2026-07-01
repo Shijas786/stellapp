@@ -628,7 +628,7 @@ export async function deployPrivacyPool(
 ): Promise<{ contractId: string; txHash: string }> {
   const wasmPath = path.join(
     __dirname,
-    "../contracts/privacy_pool/target/wasm32-unknown-unknown/release/soroban_privacy_pool_contract.optimized.wasm"
+    "../contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm"
   );
   
   if (!fs.existsSync(wasmPath)) {
@@ -692,29 +692,92 @@ export async function depositToPrivacyPool(
   );
 }
 
-/**
- * Withdraws USDC from the Privacy Pool by revealing the original secret and nullifier keys.
- */
 export async function withdrawFromPrivacyPool(
   secretKey: string,
   contractId: string,
   recipientAddress: string,
-  secretHex: string,
-  nullifierHex: string,
-  amount: string
+  amount: string,
+  proof: any,
+  publicSignals: string[],
+  nullifierHashStr: string
 ): Promise<string> {
   const scaledAmount = BigInt(Math.floor(parseFloat(amount) * 10000000)); // 7 decimals
 
   console.log(`[Stellar] Withdrawing ${amount} USDC from Privacy Pool ${contractId} to ${recipientAddress}`);
+
+  // Helper to convert hex from snarkjs to 32 bytes buffer
+  const parseHex32 = (hex: string) => {
+    let clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+    while(clean.length < 64) clean = "0" + clean;
+    return Buffer.from(clean, "hex");
+  };
+
+  // 1. Convert public signals to 32-byte buffers
+  const rootBuf = parseHex32(BigInt(publicSignals[0]).toString(16));
+  const nullifierHashBuf = parseHex32(BigInt(publicSignals[1]).toString(16));
+  const recipientSquareBuf = parseHex32(BigInt(publicSignals[2]).toString(16));
+
+  // 2. Parse Proof to 96/192/96 byte buffers
+  const parseG1 = (arr: any) => {
+    const x = parseHex32(BigInt(arr[0]).toString(16));
+    const y = parseHex32(BigInt(arr[1]).toString(16));
+    let zeros = Buffer.alloc(32); // We need 48 bytes, not 32 for each coordinate
+    // Wait, the rust VK generated 48 bytes. Snarkjs coordinates fit in 48 bytes (381 bits).
+    // So pad each coordinate to 48 bytes.
+    return Buffer.concat([Buffer.alloc(16), x, Buffer.alloc(16), y]);
+  };
+  
+  const parseG1Correct = (arr: any) => {
+    const xHexStr = BigInt(arr[0]).toString(16);
+    const yHexStr = BigInt(arr[1]).toString(16);
+    let xHex = xHexStr; while(xHex.length < 96) xHex = "0" + xHex;
+    let yHex = yHexStr; while(yHex.length < 96) yHex = "0" + yHex;
+    return Buffer.concat([Buffer.from(xHex, "hex"), Buffer.from(yHex, "hex")]);
+  };
+  
+  const parseG2Correct = (arr: any) => {
+    // Snarkjs g2: [ [x1, x0], [y1, y0] ]
+    const x1Hex = BigInt(arr[0][0]).toString(16).padStart(96, "0");
+    const x0Hex = BigInt(arr[0][1]).toString(16).padStart(96, "0");
+    const y1Hex = BigInt(arr[1][0]).toString(16).padStart(96, "0");
+    const y0Hex = BigInt(arr[1][1]).toString(16).padStart(96, "0");
+    // Arkworks order: c0 then c1.
+    return Buffer.concat([
+        Buffer.from(x0Hex, "hex"), Buffer.from(x1Hex, "hex"),
+        Buffer.from(y0Hex, "hex"), Buffer.from(y1Hex, "hex")
+    ]);
+  };
+
+  const proofA = parseG1Correct(proof.pi_a);
+  const proofB = parseG2Correct(proof.pi_b);
+  const proofC = parseG1Correct(proof.pi_c);
+
+  // 3. Construct Proof struct Map (keys must be alphabetical: "a", "b", "c")
+  const proofMap = [
+    new xdr.ScMapEntry({
+      key: xdr.ScVal.scvSymbol("a"),
+      val: xdr.ScVal.scvBytes(proofA)
+    }),
+    new xdr.ScMapEntry({
+      key: xdr.ScVal.scvSymbol("b"),
+      val: xdr.ScVal.scvBytes(proofB)
+    }),
+    new xdr.ScMapEntry({
+      key: xdr.ScVal.scvSymbol("c"),
+      val: xdr.ScVal.scvBytes(proofC)
+    })
+  ];
 
   return await invokeContractMethod(
     secretKey,
     contractId,
     "withdraw",
     [
+      xdr.ScVal.scvMap(proofMap),
+      xdr.ScVal.scvBytes(rootBuf),
+      xdr.ScVal.scvBytes(nullifierHashBuf),
+      xdr.ScVal.scvBytes(recipientSquareBuf),
       xdr.ScVal.scvAddress(Address.fromString(recipientAddress).toScAddress()),
-      xdr.ScVal.scvBytes(Buffer.from(secretHex, "hex")),
-      xdr.ScVal.scvBytes(Buffer.from(nullifierHex, "hex")),
       xdr.ScVal.scvI128(new xdr.Int128Parts({
         hi: new xdr.Int64(0),
         lo: new xdr.Uint64(scaledAmount)

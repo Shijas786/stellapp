@@ -10,6 +10,7 @@ import { ethers } from "ethers";
 import fs from "fs";
 import path from "path";
 import * as templates from "./templates";
+import * as zkPool from "../services/zk_pool";
 
 
 // ============================================================
@@ -791,21 +792,13 @@ export async function executeTool(
     case "deposit_private_pool": {
       const stellarSecret = decrypt(user.stellarSecret);
       
-      // 1. Generate secret & nullifier
-      const secret = crypto.randomBytes(32);
-      const nullifier = crypto.randomBytes(32);
-      
-      // 2. Build 16-byte big-endian amount buffer
+      const { secret, nullifier, commitment } = await zkPool.generateDeposit();
       const amountStr = args.amount;
-      const amountBI = BigInt(Math.floor(parseFloat(amountStr) * 10000000));
-      const amountBuf = Buffer.alloc(16);
-      amountBuf.writeBigUInt64BE(amountBI >> 64n, 0);
-      amountBuf.writeBigUInt64BE(amountBI & 0xffffffffffffffffn, 8);
 
-      // 3. Compute commitment
-      const preimage = Buffer.concat([secret, nullifier, amountBuf]);
-      const commitment = ethers.keccak256(preimage);
-      const commitmentHex = commitment.slice(2); // strip "0x"
+      // Ensure formatting of commitment as a hex string of 32 bytes
+      // Snarkjs numbers are large BigInt strings, so we convert them to buffer then to hex
+      let commitmentHex = BigInt(commitment).toString(16);
+      while(commitmentHex.length < 64) commitmentHex = "0" + commitmentHex;
 
       // 4. Perform deposit
       const txHash = await stellar.depositToPrivacyPool(
@@ -816,7 +809,7 @@ export async function executeTool(
       );
 
       // 5. Generate client secret note format
-      const secretNote = `stellapp-note-v1_${args.contractId}_${amountStr}_${secret.toString("hex")}_${nullifier.toString("hex")}`;
+      const secretNote = `stellapp-zk-v1_${args.contractId}_${amountStr}_${secret}_${nullifier}`;
 
       return {
         success: true,
@@ -834,23 +827,42 @@ export async function executeTool(
       // Parse the secret note
       const noteStr: string = args.secretNote.trim();
       const parts = noteStr.split("_");
-      if (parts.length !== 5 || parts[0] !== "stellapp-note-v1") {
-        throw new Error("Invalid secret note format. Must start with 'stellapp-note-v1_'.");
+      if (parts.length !== 5 || parts[0] !== "stellapp-zk-v1") {
+        throw new Error("Invalid secret note format. Must start with 'stellapp-zk-v1_'.");
       }
 
       const contractId = parts[1];
       const amountStr = parts[2];
-      const secretHex = parts[3];
-      const nullifierHex = parts[4];
+      const secret = parts[3];
+      const nullifier = parts[4];
+
+      // For the demo, we assume an empty tree. The root is computed by hashing the commitment up the tree.
+      // In a real app, we'd query the off-chain DB for the Merkle path.
+      // To keep the hackathon demo simple, we assume the bot provides empty paths.
+      const commitment = await zkPool.recomputeCommitment(secret, nullifier);
+      const pathElements = ["0", "0", "0", "0"]; // Mock paths for demo
+      const pathIndices = ["0", "0", "0", "0"];
+      const currentRoot = await zkPool.computeRoot(commitment, pathElements);
+
+      // Generate the ZK proof off-chain!
+      const { proof, publicSignals, nullifierHash } = await zkPool.generateWithdrawProof(
+        secret,
+        nullifier,
+        currentRoot,
+        pathElements,
+        pathIndices,
+        user.stellarPublic
+      );
 
       // Withdraw using user's main wallet as the recipient
       const txHash = await stellar.withdrawFromPrivacyPool(
         stellarSecret,
         contractId,
         user.stellarPublic,
-        secretHex,
-        nullifierHex,
-        amountStr
+        amountStr,
+        proof,
+        publicSignals,
+        nullifierHash
       );
 
       return {
