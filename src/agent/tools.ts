@@ -125,6 +125,182 @@ impl NftContract {
 `;
 }
 
+// ---- TIMELOCK / VESTING (from stellar/soroban-examples/timelock) ----
+function getTimelockContractTemplate(beneficiary: string, unlockLedger: string, amount: string): string {
+  return `#![no_std]
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Beneficiary,
+    UnlockLedger,
+    Amount,
+    Initialized,
+}
+
+#[contract]
+pub struct TimelockContract;
+
+#[contractimpl]
+impl TimelockContract {
+    pub fn initialize(env: Env, admin: Address, token_address: Address, amount: i128) {
+        admin.require_auth();
+        if env.storage().instance().has(&DataKey::Initialized) {
+            panic!("already initialized");
+        }
+        let beneficiary = Address::from_string(&soroban_sdk::String::from_str(&env, "${beneficiary}"));
+        env.storage().instance().set(&DataKey::Beneficiary, &beneficiary);
+        env.storage().instance().set(&DataKey::UnlockLedger, &${unlockLedger}u32);
+        env.storage().instance().set(&DataKey::Amount, &amount);
+        env.storage().instance().set(&DataKey::Initialized, &true);
+        // Transfer tokens into the contract
+        token::Client::new(&env, &token_address).transfer(&admin, &env.current_contract_address(), &amount);
+    }
+
+    pub fn claim(env: Env, token_address: Address) {
+        let beneficiary: Address = env.storage().instance().get(&DataKey::Beneficiary).unwrap();
+        beneficiary.require_auth();
+        let unlock_ledger: u32 = env.storage().instance().get(&DataKey::UnlockLedger).unwrap();
+        if env.ledger().sequence() < unlock_ledger {
+            panic!("tokens are still locked");
+        }
+        let amount: i128 = env.storage().instance().get(&DataKey::Amount).unwrap();
+        token::Client::new(&env, &token_address).transfer(&env.current_contract_address(), &beneficiary, &amount);
+        env.storage().instance().set(&DataKey::Amount, &0i128);
+    }
+
+    pub fn unlock_ledger(env: Env) -> u32 {
+        env.storage().instance().get(&DataKey::UnlockLedger).unwrap_or(0)
+    }
+}
+`;
+}
+
+// ---- STAKING ----
+function getStakingContractTemplate(name: string): string {
+  return `#![no_std]
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+
+// Staking Contract: ${name}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Stake(Address),
+    TotalStaked,
+    RewardRate,
+    Admin,
+    StakeToken,
+}
+
+#[contract]
+pub struct StakingContract;
+
+#[contractimpl]
+impl StakingContract {
+    pub fn initialize(env: Env, admin: Address, stake_token: Address, reward_rate: i128) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::StakeToken, &stake_token);
+        env.storage().instance().set(&DataKey::RewardRate, &reward_rate);
+        env.storage().instance().set(&DataKey::TotalStaked, &0i128);
+    }
+
+    pub fn stake(env: Env, user: Address, amount: i128) {
+        user.require_auth();
+        if amount <= 0 { panic!("amount must be positive"); }
+        let stake_token: Address = env.storage().instance().get(&DataKey::StakeToken).unwrap();
+        token::Client::new(&env, &stake_token).transfer(&user, &env.current_contract_address(), &amount);
+        let current: i128 = env.storage().instance().get(&DataKey::Stake(user.clone())).unwrap_or(0);
+        env.storage().instance().set(&DataKey::Stake(user.clone()), &(current + amount));
+        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap_or(0);
+        env.storage().instance().set(&DataKey::TotalStaked, &(total + amount));
+    }
+
+    pub fn unstake(env: Env, user: Address, amount: i128) {
+        user.require_auth();
+        let current: i128 = env.storage().instance().get(&DataKey::Stake(user.clone())).unwrap_or(0);
+        if current < amount { panic!("insufficient stake"); }
+        let stake_token: Address = env.storage().instance().get(&DataKey::StakeToken).unwrap();
+        token::Client::new(&env, &stake_token).transfer(&env.current_contract_address(), &user, &amount);
+        env.storage().instance().set(&DataKey::Stake(user.clone()), &(current - amount));
+        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap_or(0);
+        env.storage().instance().set(&DataKey::TotalStaked, &(total - amount));
+    }
+
+    pub fn get_stake(env: Env, user: Address) -> i128 {
+        env.storage().instance().get(&DataKey::Stake(user)).unwrap_or(0)
+    }
+
+    pub fn total_staked(env: Env) -> i128 {
+        env.storage().instance().get(&DataKey::TotalStaked).unwrap_or(0)
+    }
+}
+`;
+}
+
+// ---- VOTING / GOVERNANCE ----
+function getVotingContractTemplate(name: string, proposal: string): string {
+  return `#![no_std]
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Vec, String};
+
+// Voting Contract: ${name}
+// Proposal: ${proposal}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Vote(Address),
+    YesVotes,
+    NoVotes,
+    Deadline,
+    Admin,
+    Finalized,
+}
+
+#[contract]
+pub struct VotingContract;
+
+#[contractimpl]
+impl VotingContract {
+    pub fn initialize(env: Env, admin: Address, deadline_ledger: u32) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::Deadline, &deadline_ledger);
+        env.storage().instance().set(&DataKey::YesVotes, &0u32);
+        env.storage().instance().set(&DataKey::NoVotes, &0u32);
+        env.storage().instance().set(&DataKey::Finalized, &false);
+    }
+
+    pub fn vote(env: Env, voter: Address, approve: bool) {
+        voter.require_auth();
+        let deadline: u32 = env.storage().instance().get(&DataKey::Deadline).unwrap();
+        if env.ledger().sequence() > deadline { panic!("voting period has ended"); }
+        if env.storage().instance().has(&DataKey::Vote(voter.clone())) { panic!("already voted"); }
+        env.storage().instance().set(&DataKey::Vote(voter.clone()), &approve);
+        if approve {
+            let yes: u32 = env.storage().instance().get(&DataKey::YesVotes).unwrap_or(0);
+            env.storage().instance().set(&DataKey::YesVotes, &(yes + 1));
+        } else {
+            let no: u32 = env.storage().instance().get(&DataKey::NoVotes).unwrap_or(0);
+            env.storage().instance().set(&DataKey::NoVotes, &(no + 1));
+        }
+    }
+
+    pub fn results(env: Env) -> (u32, u32) {
+        let yes: u32 = env.storage().instance().get(&DataKey::YesVotes).unwrap_or(0);
+        let no: u32 = env.storage().instance().get(&DataKey::NoVotes).unwrap_or(0);
+        (yes, no)
+    }
+
+    pub fn has_voted(env: Env, voter: Address) -> bool {
+        env.storage().instance().has(&DataKey::Vote(voter))
+    }
+}
+`;
+}
+
 // --- Per-user rate limiter (max 1 tool call per 3 seconds) ---
 const rateLimitMap = new Map<string, number>();
 function checkRateLimit(chatId: string): void {
@@ -434,6 +610,21 @@ export async function executeTool(
         const maxSupply = args.maxSupply || "10000";
         console.log(`[Tools] Using hardcoded NFT template: ${name} (${symbol}), maxSupply=${maxSupply}`);
         rustCode = getNftContractTemplate(name, symbol, maxSupply);
+      } else if (contractType === "timelock" || contractType === "vesting") {
+        const beneficiary = args.beneficiary || args.recipient || "";
+        const unlockLedger = args.unlockLedger || args.deadline || "1000000";
+        const amount = args.amount || "0";
+        console.log(`[Tools] Using hardcoded TIMELOCK template: beneficiary=${beneficiary}, unlock=${unlockLedger}`);
+        rustCode = getTimelockContractTemplate(beneficiary, unlockLedger, amount);
+      } else if (contractType === "staking" || contractType === "stake") {
+        const name = args.name || "StakingPool";
+        console.log(`[Tools] Using hardcoded STAKING template: ${name}`);
+        rustCode = getStakingContractTemplate(name);
+      } else if (contractType === "voting" || contractType === "governance" || contractType === "vote") {
+        const name = args.name || "Governance";
+        const proposal = args.proposal || args.description || "Community Vote";
+        console.log(`[Tools] Using hardcoded VOTING template: ${name} - ${proposal}`);
+        rustCode = getVotingContractTemplate(name, proposal);
       } else {
         // For truly custom contracts, use AI-provided code
         rustCode = args.rustCode || "";
