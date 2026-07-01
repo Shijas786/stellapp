@@ -9,6 +9,8 @@ import crypto from "crypto";
 import { ethers } from "ethers";
 import fs from "fs";
 import path from "path";
+import OpenAI from "openai";
+import { exec } from "child_process";
 import * as templates from "./templates";
 import * as zkPool from "../services/zk_pool";
 
@@ -712,10 +714,35 @@ export async function executeTool(
       } else if (contractType === "lending") {
         rustCode = templates.LENDING_TEMPLATE;
       } else {
-        // For truly custom contracts, use AI-provided code
-        rustCode = args.rustCode || "";
-        if (!rustCode) throw new Error("rustCode is required for custom contracts.");
+        // For truly custom contracts, use gpt-4o as a specialized coder agent
+        const customDescription = args.customDescription || "";
+        if (!customDescription) throw new Error("customDescription is required for custom contracts.");
         
+        console.log(`[Tools] Generating custom Rust contract using gpt-4o for description: ${customDescription}`);
+        
+        const openai = new OpenAI();
+        const codeGenResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully."
+            },
+            {
+              role: "user",
+              content: `Write a Soroban smart contract with the following requirements: ${customDescription}`
+            }
+          ]
+        });
+
+        rustCode = codeGenResponse.choices[0].message.content || "";
+        
+        // Cleanup any markdown blocks if the AI accidentally included them
+        if (rustCode.startsWith("\`\`\`rust")) rustCode = rustCode.replace("\`\`\`rust", "");
+        if (rustCode.startsWith("\`\`\`")) rustCode = rustCode.replace("\`\`\`", "");
+        if (rustCode.endsWith("\`\`\`")) rustCode = rustCode.slice(0, -3);
+        rustCode = rustCode.trim();
+
         // Safety net: if AI forgot the #![no_std] directive, inject it
         if (!rustCode.includes("#![no_std]")) {
           rustCode = "#![no_std]\n" + rustCode;

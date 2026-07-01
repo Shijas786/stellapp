@@ -76,7 +76,7 @@ If a user describes any custom contract idea they have in mind (e.g., a payment 
      * **NO \`env.invoker()\`**: To check authorization, you MUST accept an \`Address\` as a parameter and call \`address.require_auth()\`.
      * **NO \`EnvObj\` or \`Runtime\`**: Do not import or use deprecated/fictional types. Use \`Map\`, \`Vec\`, \`Symbol\`, and \`Address\` directly.
 3. **Handle Modifications**: If they request changes, confirm the new parameters and re-deploy.
-- Once they confirm, invoke \`deploy_custom_contract\` with the collected structured parameters.
+- Once they confirm, invoke \`deploy_custom_contract\` with the collected structured parameters (and the \`customDescription\` if it's a custom contract).
 - Provide them with their on-chain **Contract ID (Address)**, **WASM Hash**, and explorer links once deployment completes.
 
 ### 4. 🤝 INTERACTIVE ESCROW DEPLOYMENT DIALOGUE
@@ -363,9 +363,9 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
             type: "string",
             description: "For NFT contracts: max supply (e.g. '1000')"
           },
-          rustCode: {
+          customDescription: {
             type: "string",
-            description: "Required when contractType='custom'. The complete, syntactically correct Rust source code of the contract using soroban-sdk (v21.7.7) following the smart-contract and OpenZeppelin patterns."
+            description: "Required when contractType='custom'. A detailed description of what the custom smart contract should do. This will be sent to the specialized coding agent to generate the Rust code."
           }
         },
         required: ["contractType", "name", "symbol"]
