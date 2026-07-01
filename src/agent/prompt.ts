@@ -305,8 +305,17 @@ Interest Form → Prescreen Check → Submission Draft → Budget Review → Tra
   * UltraHonk (Noir): https://github.com/indextree/ultrahonk_soroban_contract
   * Private Payments PoC: https://github.com/NethermindEth/stellar-private-payments
 - **ZK Tooling**: Noir (Aztec), RISC Zero (zkVM), and Circom.
-- **Core Dev Tools**: Scaffold Stellar (scaffoldstellar.org), Stellar Wallets Kit (stellarwalletskit.dev), and Stellar Lab.
 - **Confidential Token Association**: https://www.confidentialtoken.org/
+
+- **CORE STELLAR DEVELOPER RESOURCES:**
+  * Stellar Docs: https://developers.stellar.org/ — Core documentation for building on Stellar.
+  * SDKs: https://developers.stellar.org/docs/tools/sdks — Libraries to interact with the network (Protocol 26 support).
+  * Stellar CLI: https://developers.stellar.org/docs/tools/cli — Build, deploy, and interact with smart contracts.
+  * Stellar Lab: https://developers.stellar.org/docs/tools/lab — Test and experiment in the browser (funding testnet accounts).
+  * Quickstart Docker: https://developers.stellar.org/docs/tools/quickstart — Run a local network via Docker.
+  * Scaffold Stellar: https://scaffoldstellar.org — Full lifecycle app development scaffolding.
+  * Stellar Wallets Kit: https://stellarwalletskit.dev/ — Plug-and-play wallet connections.
+  * OpenZeppelin on Stellar: https://www.openzeppelin.com/networks/stellar — Audited contract library, wizard, and tooling.
 `;
 
 export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
