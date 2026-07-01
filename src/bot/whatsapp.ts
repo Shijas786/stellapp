@@ -5,6 +5,7 @@ import path from "path";
 import os from "os";
 import { handleIncomingMessage } from "./controller";
 import { transcribeAudio, generateSpeech } from "../agent/agent";
+import { prisma } from "../services/db";
 
 export class WhatsAppBot {
   private client: Client;
@@ -146,6 +147,58 @@ export class WhatsAppBot {
 
         let text = msg.body;
         let isVoice = false;
+
+        // Check if message is a contact card
+        if (msg.type === "vcard" || msg.type === "multi_vcard") {
+          console.log(`[WhatsApp] Received vCard message.`);
+          
+          let vCards: string[] = [];
+          if (msg.type === "vcard" && msg.body) {
+            vCards.push(msg.body);
+          } else if (msg.vCards && msg.vCards.length > 0) {
+            vCards = msg.vCards;
+          }
+
+          if (vCards.length > 0) {
+            let savedCount = 0;
+            // Fetch user
+            const user = await prisma.user.findUnique({
+              where: { chatId: msg.from }
+            });
+            
+            if (!user) {
+              await msg.reply("⚠️ You must be registered (have sent at least one normal message) to save contacts.");
+              return;
+            }
+
+            for (const vcard of vCards) {
+              const nameMatch = vcard.match(/FN:(.+)/);
+              const name = nameMatch ? nameMatch[1].trim() : "Unknown";
+              
+              let phoneNumber = "";
+              const waidMatch = vcard.match(/waid=([0-9]+)/);
+              if (waidMatch) {
+                phoneNumber = waidMatch[1];
+              } else {
+                const telMatch = vcard.match(/TEL.*:(.+)/);
+                if (telMatch) {
+                  phoneNumber = telMatch[1].replace(/[\s\-+]/g, "");
+                }
+              }
+
+              if (phoneNumber) {
+                await prisma.contact.upsert({
+                  where: { ownerId_name: { ownerId: user.id, name: name.toLowerCase() } },
+                  update: { phoneNumber },
+                  create: { ownerId: user.id, name: name.toLowerCase(), phoneNumber }
+                });
+                savedCount++;
+                await msg.reply(`✅ Saved *${name}* (+${phoneNumber}) to your address book!`);
+              }
+            }
+            if (savedCount > 0) return;
+          }
+        }
 
         // Check if message is a voice note or audio file
         if (msg.type === "ptt" || msg.type === "audio") {
