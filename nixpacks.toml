@@ -1,11 +1,10 @@
-providers = ["node"]
-
-[phases.setup]
-nixPkgs = ["...", "rustup"]
+providers = ["node", "rust"]
 
 [phases.build]
 cmds = [
     "npm run build",
-    "rustup default stable",
     "rustup target add wasm32-unknown-unknown"
 ]
+
+[phases.start]
+cmd = "npm run start"
