@@ -478,9 +478,10 @@ export async function executeTool(
 
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
       if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
-        const isPhone = /^\+?[0-9]{10,18}$/.test(recipient);
+        const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
+        const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
         if (isPhone) {
-          const cleanPhone = recipient.replace("+", "");
+          const cleanPhone = cleanedRecipient;
           console.log(`[Tools] Recipient is a phone number. Resolving: ${cleanPhone}`);
           
           let resolved = await prisma.user.findFirst({

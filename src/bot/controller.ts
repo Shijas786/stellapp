@@ -1,7 +1,7 @@
 import { config } from "../services/config";
 import { prisma } from "../services/db";
-import { encrypt } from "../services/encryption";
-import { createStellarWallet, fundStellarAccount } from "../services/stellar";
+import { encrypt, decrypt } from "../services/encryption";
+import { createStellarWallet, fundStellarAccount, ensureUSDCTrustline } from "../services/stellar";
 import { createEVMWallet } from "../services/evm";
 import { runAgentLoop } from "../agent/agent";
 
@@ -83,8 +83,16 @@ export async function handleIncomingMessage(
     if (!config.isMainnet) {
       console.log(`[Controller] Funding Stellar account on Testnet for: ${user.stellarPublic}`);
       const funded = await fundStellarAccount(user.stellarPublic);
+      if (funded) {
+        try {
+          console.log(`[Controller] Establishing USDC trustline on Testnet for: ${user.stellarPublic}`);
+          await ensureUSDCTrustline(decrypt(user.stellarSecret));
+        } catch (e) {
+          console.error(`[Controller] Failed to establish USDC trustline:`, e);
+        }
+      }
       fundingStatus = funded 
-        ? "🎁 I've funded your Stellar wallet with *10,000 Testnet XLM* so you can start immediately!" 
+        ? "🎁 I've funded your Stellar wallet with *10,000 Testnet XLM* and a USDC Trustline so you can start immediately!" 
         : "⚠️ I tried to fund your Stellar account with testnet XLM but Friendbot was busy. Try typing 'fund me' in a moment!";
     } else {
       fundingStatus = `⚠️ *Account Not Yet Active*\n\nTo activate your Stellar wallet, please send a minimum of *2 XLM* to your address:\n\n\`${user.stellarPublic}\`\n\nOnce received, type: *"activate my account"* and I'll set up everything automatically (USDC trustline, etc.).`;
