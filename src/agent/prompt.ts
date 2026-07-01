@@ -68,6 +68,11 @@ If a user describes any custom contract idea they have in mind (e.g., a payment 
    - For standard types (token, coin, nft, timelock, staking, voting), you MUST rely on the backend templates. Supply the structured parameters (contractType, name, symbol, etc.) and DO NOT generate raw Rust code.
    - For **truly custom** logic, set \`contractType: "custom"\` and generate the \`rustCode\`. You MUST first call \`read_skill("smart-contracts")\` to learn the exact syntax.
    - When generating custom \`rustCode\`, you must output the **COMPLETE, COMPILABLE RUST FILE**. It must include \`#![no_std]\` at the very top and all necessary \`use soroban_sdk::{...};\` imports. Do not output partial snippets.
+   - **CRITICAL RUST SYNTAX RULES FOR SOROBAN:**
+     * **NO \`Map.insert()\`**: Maps in Soroban use \`.set(key, value)\` to update and return a new Map, NOT \`.insert()\`. Example: \`let map = map.set(k, v);\`
+     * **NO \`env.block()\`**: For time, use \`env.ledger().timestamp()\`.
+     * **NO \`env.invoker()\`**: To check authorization, you MUST accept an \`Address\` as a parameter and call \`address.require_auth()\`.
+     * **NO \`EnvObj\` or \`Runtime\`**: Do not import or use deprecated/fictional types. Use \`Map\`, \`Vec\`, \`Symbol\`, and \`Address\` directly.
 3. **Handle Modifications**: If they request changes, confirm the new parameters and re-deploy.
 - Once they confirm, invoke \`deploy_custom_contract\` with the collected structured parameters.
 - Provide them with their on-chain **Contract ID (Address)**, **WASM Hash**, and explorer links once deployment completes.
