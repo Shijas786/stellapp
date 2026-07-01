@@ -150,6 +150,22 @@ Every correct Soroban contract has these 4 components in order:
 - Admin pattern: load from storage, then call \`.require_auth()\` on it
 - NEVER use the removed \`env.invoker()\` function
 
+**SOROBAN COLLECTIONS & TYPES (CRITICAL RULES):**
+Soroban has its own memory-safe collection types that reference host objects. NEVER use Rust standard library \`HashMap\` or \`Vec\` directly. Follow these exact patterns:
+- **Map (Dict)**:
+  * Create: \`let mut map = Map::<Address, i128>::new(&env);\` (ALWAYS pass \`&env\` as the argument to new)
+  * Read: \`let val = map.get(key).unwrap_or(0);\` (key is passed BY VALUE, not by reference. Use \`key\` or \`key.clone()\`, NEVER \`&key\`)
+  * Write: \`map.set(key, value);\` (use \`.set(k, v)\`, there is NO \`.insert()\` method!)
+  * Delete: \`map.remove(key);\`
+- **Vec (List)**:
+  * Create: \`let mut vec = Vec::<u32>::new(&env);\` or \`let vec = vec![&env, 1, 2];\`
+  * Append: \`vec.push_back(value);\` (there is NO \`.push()\` method!)
+  * Read: \`let val = vec.get(index).unwrap();\`
+- **Address & Symbols**:
+  * Address is used for all accounts and contracts.
+  * Short symbols: \`symbol_short!("my_sym")\` (max 9 chars).
+  * Long symbols: \`Symbol::new(&env, "my_longer_symbol_max_32")\`.
+
 **ERROR HANDLING (correct pattern):**
 \`\`\`rust
 #[contracterror]
@@ -158,6 +174,7 @@ Every correct Soroban contract has these 4 components in order:
 pub enum ContractError { NotInitialized = 1, InsufficientBalance = 2, InvalidAmount = 3 }
 \`\`\`
 Return \`Result<(), ContractError>\` — never panic for business logic errors.
+
 
 **SECURITY RULES (from security.md):**
 - Every privileged function MUST call \`require_auth()\` — missing auth is the #1 bug
