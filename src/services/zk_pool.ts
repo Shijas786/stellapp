@@ -69,8 +69,8 @@ export async function generateWithdrawProof(
 ) {
     await initPoseidon();
     
-    const wasmPath = path.join(__dirname, "../../circuits/privacy_pool_js/privacy_pool.wasm");
-    const zkeyPath = path.join(__dirname, "../../circuits/privacy_pool_final.zkey");
+    const wasmPath = path.join(process.cwd(), "circuits/privacy_pool_js/privacy_pool.wasm");
+    const zkeyPath = path.join(process.cwd(), "circuits/privacy_pool_final.zkey");
     
     // Bind recipient (simple hash/num of string for demo)
     const recipientNum = bufferToBigInt(Buffer.from(recipientAddressStr.slice(0, 31))).toString();

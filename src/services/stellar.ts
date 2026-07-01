@@ -627,8 +627,8 @@ export async function deployPrivacyPool(
   secretKey: string
 ): Promise<{ contractId: string; txHash: string }> {
   const wasmPath = path.join(
-    __dirname,
-    "../contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm"
+    process.cwd(),
+    "contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm"
   );
   
   if (!fs.existsSync(wasmPath)) {
