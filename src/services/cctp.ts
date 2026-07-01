@@ -8,7 +8,8 @@ import {
   rpc,
   xdr,
   Address,
-  Operation
+  Operation,
+  Asset
 } from "@stellar/stellar-sdk";
 import { config } from "./config";
 
@@ -187,22 +188,10 @@ export async function burnUSDCOnStellar(
   const cleanEvm = evmRecipientAddress.startsWith("0x") ? evmRecipientAddress.slice(2) : evmRecipientAddress;
   const evmBytes = Buffer.from(cleanEvm.padStart(64, "0"), "hex");
 
-  // burn_token address (USDC on Stellar) is needed. We can derive it by fetching the USDC asset address, or we can use the known contract ID.
-  // Actually, on Stellar CCTP, the deposit_for_burn args:
-  // amount: i128
-  // destination_domain: u32
-  // mint_recipient: bytesN<32>
-  // burn_token: Address
-  
-  // We need the Stellar USDC contract ID.
-  // For testnet it's typically known. Let's use config.usdcStellarContract if available, else derive from asset.
-  let stellarUsdcContract = "";
-  if (config.isMainnet) {
-    stellarUsdcContract = "CEQKNGVDNAPIE3LOMV4LBA6Z44LUDH55C75A77ZOF3W257AHTN52N7XY";
-  } else {
-    // Standard testnet USDC contract
-    stellarUsdcContract = "CCW67TSZV36DOOMC4OMGEEEQAM3L2T7A4Z3FY7JUSVAF5F2CIGT2MDF7"; 
-  }
+  // burn_token address (USDC on Stellar) is needed. We can derive it by fetching the USDC asset address
+  const networkPassphrase = PASSPHRASE;
+  const usdcAsset = new Asset(config.stellarUsdcCode, config.stellarUsdcIssuer);
+  const stellarUsdcContract = usdcAsset.contractId(networkPassphrase);
 
   const invokeOp = Operation.invokeContractFunction({
     contract: STELLAR_TOKEN_MESSENGER,
