@@ -645,13 +645,15 @@ export async function deployPrivacyPool(
   console.log(`[Stellar] Contract instantiated. ID: ${contractId}`);
 
   const usdcContractId = USDC_ASSET.contractId(PASSPHRASE);
-  console.log(`[Stellar] Initializing Privacy Pool with USDC Contract ID: ${usdcContractId}`);
+  const publicKey = Keypair.fromSecret(secretKey).publicKey();
+  console.log(`[Stellar] Initializing Privacy Pool with Admin: ${publicKey} and USDC Contract ID: ${usdcContractId}`);
 
   const initTx = await invokeContractMethod(
     secretKey,
     contractId,
     "initialize",
     [
+      xdr.ScVal.scvAddress(Address.fromString(publicKey).toScAddress()),
       xdr.ScVal.scvAddress(Address.fromString(usdcContractId).toScAddress())
     ]
   );
