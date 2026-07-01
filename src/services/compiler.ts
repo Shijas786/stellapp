@@ -22,16 +22,12 @@ export function compileRustContract(rustCode: string): Buffer {
     console.warn("[Compiler] Warning: cargo clean failed:", error.message);
   }
 
-  console.log("[Compiler] Executing Cargo build target wasm32-unknown-unknown...");
+  console.log("[Compiler] Executing Cargo build target wasm32v1-none...");
   try {
-    // Run cargo build synchronously. Disable reference-types and multi-value features which are unsupported by Soroban VM validator.
-    execSync("cargo build --target wasm32-unknown-unknown --release", {
+    // Run cargo build synchronously. wasm32v1-none disables reference-types and multivalue by default.
+    execSync("cargo build --target wasm32v1-none --release", {
       cwd: COMPILER_DIR,
-      stdio: "pipe", // keep logs in case we need to diagnose compile errors
-      env: {
-        ...process.env,
-        RUSTFLAGS: "-C target-feature=-reference-types,-multi-value"
-      }
+      stdio: "pipe" // keep logs in case we need to diagnose compile errors
     });
   } catch (error: any) {
     const errorMsg = error.stderr ? error.stderr.toString() : error.message;
@@ -42,7 +38,7 @@ export function compileRustContract(rustCode: string): Buffer {
   // Find the compiled wasm file (Cargo replaces hyphens with underscores for the wasm target)
   const wasmPath = path.join(
     COMPILER_DIR,
-    "target/wasm32-unknown-unknown/release/soroban_custom_compiler.wasm"
+    "target/wasm32v1-none/release/soroban_custom_compiler.wasm"
   );
 
   if (!fs.existsSync(wasmPath)) {

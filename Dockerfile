@@ -23,13 +23,13 @@ RUN apt-get update && apt-get install -y \
   rm -rf /var/lib/apt/lists/*
 
 # ============================================
-# Install Rust & Soroban (Pin to 1.81.0 to prevent reference-types error)
+# Install Rust & Soroban
 # ============================================
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.81.0
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Add WASM target for Soroban
-RUN rustup target add wasm32-unknown-unknown
+# Add WASM target for Soroban (wasm32v1-none disables reference-types and multivalue by default)
+RUN rustup target add wasm32v1-none
 
 # Install Soroban CLI
 RUN cargo install soroban-cli --locked
