@@ -70,6 +70,8 @@ If a user describes any custom contract idea they have in mind (e.g., a payment 
    - When generating custom \`rustCode\`, you must output the **COMPLETE, COMPILABLE RUST FILE**. It must include \`#![no_std]\` at the very top and all necessary \`use soroban_sdk::{...};\` imports. Do not output partial snippets.
    - **CRITICAL RUST SYNTAX RULES FOR SOROBAN:**
      * **NO \`Map.insert()\`**: Maps in Soroban use \`.set(key, value)\` to update and return a new Map, NOT \`.insert()\`. Example: \`let map = map.set(k, v);\`
+     * **NO \`unwrap_or_default()\` on Map**: Soroban's Map does not implement Default. Always initialize with \`Map::new(&env)\`.
+     * **NO references in Map keys**: \`Map::get()\` and similar SDK methods take OWNED keys/values, not references. Use \`map.get(key)\`, NOT \`map.get(&key)\`.
      * **NO \`env.block()\`**: For time, use \`env.ledger().timestamp()\`.
      * **NO \`env.invoker()\`**: To check authorization, you MUST accept an \`Address\` as a parameter and call \`address.require_auth()\`.
      * **NO \`EnvObj\` or \`Runtime\`**: Do not import or use deprecated/fictional types. Use \`Map\`, \`Vec\`, \`Symbol\`, and \`Address\` directly.
