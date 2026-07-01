@@ -23,9 +23,9 @@ RUN apt-get update && apt-get install -y \
   rm -rf /var/lib/apt/lists/*
 
 # ============================================
-# Install Rust & Soroban
+# Install Rust & Soroban (Pin to 1.81.0 to prevent reference-types error)
 # ============================================
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.81.0
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Add WASM target for Soroban
