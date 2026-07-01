@@ -17,10 +17,14 @@ export function compileRustContract(rustCode: string): Buffer {
 
   console.log("[Compiler] Executing Cargo build target wasm32-unknown-unknown...");
   try {
-    // Run cargo build synchronously. This is extremely fast because dependencies are cached.
+    // Run cargo build synchronously. Disable reference-types and multi-value features which are unsupported by Soroban VM validator.
     execSync("cargo build --target wasm32-unknown-unknown --release", {
       cwd: COMPILER_DIR,
-      stdio: "pipe" // keep logs in case we need to diagnose compile errors
+      stdio: "pipe", // keep logs in case we need to diagnose compile errors
+      env: {
+        ...process.env,
+        RUSTFLAGS: "-C target-feature=-reference-types,-multi-value"
+      }
     });
   } catch (error: any) {
     const errorMsg = error.stderr ? error.stderr.toString() : error.message;
