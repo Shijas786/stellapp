@@ -84,8 +84,8 @@ export async function runAgentLoop(
   let assistantMessage = response.choices[0].message;
   history.push(assistantMessage);
 
-  // Allow up to 3 sequential tool calling rounds (for multi-step agent actions)
-  for (let round = 0; round < 3; round++) {
+  // Allow up to 5 sequential tool calling rounds (for multi-step agent actions)
+  for (let round = 0; round < 5; round++) {
     if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
       break; // No tools to call
     }
@@ -159,6 +159,18 @@ export async function runAgentLoop(
     });
 
     assistantMessage = response.choices[0].message;
+    history.push(assistantMessage);
+  }
+
+  // If the loop exited but the last message is a tool call, we must remove it from history
+  // because we didn't execute the tools, rendering the history invalid for future turns.
+  if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+    history.pop();
+    assistantMessage = {
+      role: "assistant",
+      content: "⚠️ I reached my internal processing limit trying to fulfill your request. Please try again or break the task into smaller steps.",
+      refusal: null
+    };
     history.push(assistantMessage);
   }
 
