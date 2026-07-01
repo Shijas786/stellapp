@@ -620,6 +620,28 @@ export async function executeTool(
       };
     }
 
+    case "bridge_stellar_to_evm": {
+      const evmPrivateKey = decrypt(user.evmPrivateKey);
+      const stellarSecret = decrypt(user.stellarSecret);
+
+      // 1. Fire the burn transaction on Stellar
+      const burnTxHash = await cctp.burnUSDCOnStellar(
+        stellarSecret,
+        args.amount,
+        user.evmAddress
+      );
+
+      // 2. Start polling and minting asynchronously in the background
+      runReverseBridgeBackgroundWorker(chatId, evmPrivateKey, burnTxHash, args.amount);
+
+      return {
+        success: true,
+        burnTxHash,
+        explorerUrl: `${config.explorerUrlStellar}${burnTxHash}`,
+        message: `Outbound bridge initialized. Burn Tx: ${burnTxHash}. I will notify you here once the USDC arrives on your EVM wallet!`
+      };
+    }
+
     case "deploy_escrow_contract": {
       const stellarSecret = decrypt(user.stellarSecret);
       const { contractId, txHash } = await stellar.deployEscrowContract(
@@ -936,6 +958,40 @@ function runBridgeBackgroundWorker(
       await sendNotification(
         chatId,
         `⚠️ *Bridge Failed!* \n\nFailed to mint your *${amount} USDC* on Stellar: ${error.message}. Please contact support with message hash:\n\`${messageHash}\``
+      );
+    });
+}
+
+/**
+ * Background worker to poll Circle attestation by txHash and execute mint on EVM.
+ */
+function runReverseBridgeBackgroundWorker(
+  chatId: string,
+  evmPrivateKey: string,
+  burnTxHash: string,
+  amount: string
+) {
+  Promise.resolve()
+    .then(async () => {
+      const sourceDomain = 27; // Stellar Domain ID
+      
+      // 1. Poll attestation by txHash
+      const { attestationHex, messageBytesHex } = await cctp.pollForCircleAttestationByTxHash(burnTxHash, sourceDomain);
+      
+      // 2. Submit mint on EVM
+      const mintTxHash = await evm.receiveMessageOnEVM(evmPrivateKey, messageBytesHex, attestationHex);
+      
+      // 3. Notify user via WhatsApp
+      await sendNotification(
+        chatId,
+        `🎉 *Reverse Bridge Complete!* \n\nSuccessfully bridged *${amount} USDC* to your EVM wallet!\n\n🔗 *Mint Transaction:* ${config.explorerUrlBase}${mintTxHash}`
+      );
+    })
+    .catch(async (error: any) => {
+      console.error("[CCTP Reverse Background Worker] Bridging failed:", error.message);
+      await sendNotification(
+        chatId,
+        `⚠️ *Reverse Bridge Failed!* \n\nFailed to mint your *${amount} USDC* on EVM: ${error.message}. Please contact support with burn tx hash:\n\`${burnTxHash}\``
       );
     });
 }

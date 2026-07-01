@@ -6,6 +6,7 @@ const provider = new ethers.JsonRpcProvider(config.evmRpcUrl);
 
 // Base CCTP and USDC Contract Addresses
 const TokenMessengerAddress = config.evmCctpTokenMessenger;
+const MessageTransmitterAddress = config.evmMessageTransmitter;
 const USDCAddress = config.evmUsdcAddress;
 
 // Simple Human-Readable ABIs
@@ -17,6 +18,10 @@ const ERC20_ABI = [
 
 const TokenMessenger_ABI = [
   "function depositForBurnWithHook(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold, bytes hookData) returns (uint64 nonce)"
+];
+
+const MessageTransmitter_ABI = [
+  "function receiveMessage(bytes message, bytes attestation) returns (bool success)"
 ];
 
 // Stellar CctpForwarder Contract ID
@@ -168,4 +173,36 @@ function extractMessageBytesAndHash(receipt: ethers.TransactionReceipt): { messa
   }
   
   throw new Error("CCTP MessageSent event log not found in transaction receipt.");
+}
+
+/**
+ * Submits the CCTP attestation and message to the Base EVM MessageTransmitter contract to mint USDC on EVM.
+ * Returns the final EVM transaction hash.
+ */
+export async function receiveMessageOnEVM(
+  privateKey: string,
+  messageBytesHex: string,
+  attestationHex: string
+): Promise<string> {
+  try {
+    const wallet = new ethers.Wallet(privateKey, provider);
+    const messageTransmitter = new ethers.Contract(MessageTransmitterAddress, MessageTransmitter_ABI, wallet);
+
+    // Ensure hex starts with 0x
+    const messageBytes = messageBytesHex.startsWith("0x") ? messageBytesHex : "0x" + messageBytesHex;
+    const attestationBytes = attestationHex.startsWith("0x") ? attestationHex : "0x" + attestationHex;
+
+    console.log(`Executing receiveMessage on EVM MessageTransmitter...`);
+    
+    // receiveMessage(bytes message, bytes attestation)
+    const tx = await messageTransmitter.receiveMessage(messageBytes, attestationBytes);
+    
+    const receipt = await tx.wait();
+    console.log("Receive message transaction confirmed on EVM:", tx.hash);
+
+    return tx.hash;
+  } catch (error: any) {
+    console.error("Failed in receiveMessageOnEVM:", error.message);
+    throw error;
+  }
 }

@@ -433,5 +433,22 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
         required: ["secretNote"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "bridge_stellar_to_evm",
+      description: "Bridges USDC from the user's Stellar wallet to their EVM wallet using Circle's CCTP. Use this ONLY when the user explicitly wants to send USDC from Stellar to Base/EVM.",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: {
+            type: "string",
+            description: "The amount of USDC to bridge (e.g. '100')"
+          }
+        },
+        required: ["amount"]
+      }
+    }
   }
 ];
