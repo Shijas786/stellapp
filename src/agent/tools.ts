@@ -8,6 +8,123 @@ import { prisma } from "../services/db";
 import crypto from "crypto";
 import { ethers } from "ethers";
 
+// ============================================================
+// HARDCODED SOROBAN v21.7.7 CONTRACT TEMPLATES
+// These are proven, compiler-verified templates. NEVER let the
+// AI generate Rust code from scratch — it always hallucinates.
+// ============================================================
+function getTokenContractTemplate(name: string, symbol: string, initialSupply: string, decimals: string): string {
+  return `#![no_std]
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+
+// Token Name: ${name} | Symbol: ${symbol} | Decimals: ${decimals}
+const INITIAL_SUPPLY: i128 = ${initialSupply};
+
+#[contracttype]
+pub enum DataKey {
+    Balance(Address),
+    TotalSupply,
+    Admin,
+    Decimals,
+}
+
+#[contract]
+pub struct TokenContract;
+
+#[contractimpl]
+impl TokenContract {
+    pub fn initialize(env: Env, admin: Address) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::TotalSupply, &INITIAL_SUPPLY);
+        env.storage().instance().set(&DataKey::Decimals, &${decimals}i32);
+        env.storage().instance().set(&DataKey::Balance(admin.clone()), &INITIAL_SUPPLY);
+    }
+
+    pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+        from.require_auth();
+        let from_bal: i128 = env.storage().instance().get(&DataKey::Balance(from.clone())).unwrap_or(0);
+        let to_bal: i128 = env.storage().instance().get(&DataKey::Balance(to.clone())).unwrap_or(0);
+        if from_bal < amount {
+            panic!("insufficient balance");
+        }
+        env.storage().instance().set(&DataKey::Balance(from.clone()), &(from_bal - amount));
+        env.storage().instance().set(&DataKey::Balance(to.clone()), &(to_bal + amount));
+    }
+
+    pub fn balance(env: Env, owner: Address) -> i128 {
+        env.storage().instance().get(&DataKey::Balance(owner)).unwrap_or(0)
+    }
+
+    pub fn total_supply(env: Env) -> i128 {
+        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+    }
+
+    pub fn decimals(env: Env) -> i32 {
+        env.storage().instance().get(&DataKey::Decimals).unwrap_or(7)
+    }
+}
+`;
+}
+
+function getNftContractTemplate(name: string, symbol: string, maxSupply: string): string {
+  return `#![no_std]
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+
+// NFT Name: ${name} | Symbol: ${symbol} | Max Supply: ${maxSupply}
+const MAX_SUPPLY: u32 = ${maxSupply};
+
+#[contracttype]
+pub enum DataKey {
+    Owner(u32),
+    TotalSupply,
+    Admin,
+}
+
+#[contract]
+pub struct NftContract;
+
+#[contractimpl]
+impl NftContract {
+    pub fn initialize(env: Env, admin: Address) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::TotalSupply, &0u32);
+    }
+
+    pub fn mint(env: Env, to: Address) -> u32 {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+        let supply: u32 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
+        if supply >= MAX_SUPPLY {
+            panic!("max supply reached");
+        }
+        let new_id = supply + 1;
+        env.storage().instance().set(&DataKey::Owner(new_id), &to);
+        env.storage().instance().set(&DataKey::TotalSupply, &new_id);
+        new_id
+    }
+
+    pub fn transfer(env: Env, from: Address, to: Address, nft_id: u32) {
+        from.require_auth();
+        let owner: Address = env.storage().instance().get(&DataKey::Owner(nft_id)).expect("NFT not found");
+        if owner != from {
+            panic!("not the owner");
+        }
+        env.storage().instance().set(&DataKey::Owner(nft_id), &to);
+    }
+
+    pub fn owner_of(env: Env, nft_id: u32) -> Option<Address> {
+        env.storage().instance().get(&DataKey::Owner(nft_id))
+    }
+
+    pub fn total_supply(env: Env) -> u32 {
+        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+    }
+}
+`;
+}
+
 // --- Per-user rate limiter (max 1 tool call per 3 seconds) ---
 const rateLimitMap = new Map<string, number>();
 function checkRateLimit(chatId: string): void {
@@ -299,16 +416,39 @@ export async function executeTool(
 
     case "deploy_custom_contract": {
       const stellarSecret = decrypt(user.stellarSecret);
-      
-      // 1. Compile Rust source code to WASM binary using cached cargo compiler
-      console.log(`[Tools] Starting custom contract compilation...`);
-      const wasmBytes = compileRustContract(args.rustCode);
-      
+      const contractType: string = (args.contractType || "custom").toLowerCase();
+
+      // ⭐ Use hardcoded proven templates instead of AI-generated Rust
+      // This prevents hallucination errors entirely.
+      let rustCode: string;
+      if (contractType === "token" || contractType === "coin") {
+        const name = args.name || "MyToken";
+        const symbol = (args.symbol || "MTK").substring(0, 9);
+        const supply = String(Math.round(parseFloat(args.initialSupply || "1000000") * Math.pow(10, parseInt(args.decimals || "7"))));
+        const decimals = args.decimals || "7";
+        console.log(`[Tools] Using hardcoded TOKEN template: ${name} (${symbol}), supply=${supply}, decimals=${decimals}`);
+        rustCode = getTokenContractTemplate(name, symbol, supply, decimals);
+      } else if (contractType === "nft") {
+        const name = args.name || "MyNFT";
+        const symbol = (args.symbol || "MNFT").substring(0, 9);
+        const maxSupply = args.maxSupply || "10000";
+        console.log(`[Tools] Using hardcoded NFT template: ${name} (${symbol}), maxSupply=${maxSupply}`);
+        rustCode = getNftContractTemplate(name, symbol, maxSupply);
+      } else {
+        // For truly custom contracts, use AI-provided code
+        rustCode = args.rustCode || "";
+        if (!rustCode) throw new Error("rustCode is required for custom contracts.");
+      }
+
+      // 1. Compile chosen template to WASM
+      console.log(`[Tools] Starting custom contract compilation (type=${contractType})...`);
+      const wasmBytes = compileRustContract(rustCode);
+
       // 2. Upload WASM bytes on-chain
       console.log(`[Tools] Uploading WASM bytecode on-chain...`);
       const { wasmHash, txHash: uploadTxHash } = await stellar.uploadWasm(stellarSecret, wasmBytes);
       console.log(`[Tools] Contract WASM uploaded. Hash: ${wasmHash}`);
-      
+
       // 3. Instantiate the contract instance on-chain
       console.log(`[Tools] Instantiating contract instance from WASM hash...`);
       const { contractId, txHash: instantiateTxHash } = await stellar.instantiateContract(stellarSecret, wasmHash);

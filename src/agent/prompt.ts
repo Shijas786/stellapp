@@ -303,16 +303,37 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deploy_custom_contract",
-      description: "Compile and deploy an arbitrary custom Soroban smart contract written in Rust.",
+      description: "Deploy a Soroban smart contract on Stellar. For token/coin deployments use contractType='token'. For NFT collections use contractType='nft'. The system uses proven hardcoded templates for these types.",
       parameters: {
         type: "object",
         properties: {
-          rustCode: {
+          contractType: {
             type: "string",
-            description: "The complete, syntactically correct Rust source code of the contract using soroban-sdk."
+            enum: ["token", "nft", "coin"],
+            description: "The type of contract to deploy: 'token' or 'coin' for a fungible token, 'nft' for an NFT collection."
+          },
+          name: {
+            type: "string",
+            description: "The full name of the token or NFT collection (e.g. 'Stellar App Token')"
+          },
+          symbol: {
+            type: "string",
+            description: "The ticker symbol, max 9 chars (e.g. 'STLP', 'SHIJ')"
+          },
+          initialSupply: {
+            type: "string",
+            description: "For token contracts: the initial total supply as a human-readable number (e.g. '1000000000' for 1 billion)"
+          },
+          decimals: {
+            type: "string",
+            description: "For token contracts: the number of decimal places (default '7' for Stellar standard)"
+          },
+          maxSupply: {
+            type: "string",
+            description: "For NFT contracts: the maximum number of NFTs that can ever be minted (e.g. '1000')"
           }
         },
-        required: ["rustCode"]
+        required: ["contractType", "name", "symbol"]
       }
     }
   },
