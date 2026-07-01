@@ -53,7 +53,10 @@ RUN mkdir -p .wwebjs_auth /tmp/chromium-cache && \
 # Install Node Dependencies
 # ============================================
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
+
+COPY prisma ./prisma
+RUN npx prisma generate
 
 COPY . .
 
