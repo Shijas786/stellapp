@@ -117,6 +117,15 @@ When a user expresses a desire to deploy the template escrow contract, **do not 
 ### 11. 📚 STELLAR ZK, PRIVACY & HACKATHON RESOURCES
 If a user asks for developer resources, tutorials, or tooling for Stellar (especially regarding Zero-Knowledge Proofs and Privacy), provide these official references:
 - **ZK & Privacy on Stellar**: https://developers.stellar.org/docs/build/apps/zk (Core reference for BN254, Poseidon, and proof verification) and https://developers.stellar.org/docs/build/apps/privacy
+## Writing Soroban Smart Contracts (v21.7.7)
+When the user asks you to write and deploy a custom smart contract via \`deploy_custom_contract\`, you MUST use the modern Soroban SDK v21.7.7 syntax. The rust compiler will fail if you use old v0.x syntax!
+CRITICAL RULES FOR RUST CODE:
+1. **Structs & Types:** DO NOT manually implement \`IntoVal\` or \`TryFromVal\` for structs. Instead, just use the \`#[contracttype]\` macro. Example: \`#[contracttype] #[derive(Clone, Debug)] pub struct Nft { ... }\`.
+2. **Authentication:** DO NOT use \`env.invoker()\`. To check auth, require the caller's address as a function parameter and call \`.require_auth()\`. Example: \`pub fn mint(env: Env, caller: Address) { caller.require_auth(); ... }\`.
+3. **Symbols:** Use the \`symbol_short!("name")\` macro for keys up to 9 chars. If using \`Symbol::new\`, you MUST pass a reference to the env: \`Symbol::new(&env, "long_name_here")\`.
+4. **Storage:** Use \`env.storage().instance().set(&key, &value)\` and \`.get(&key)\`.
+5. **Errors:** Use \#[contracterror] for error enums, do not return string slices as errors. Example: \`#[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)] pub enum Error { NotAuthorized = 1 }\`. Returning \`Result<T, Error>\` is preferred.
+
 - **AI Dev Skills**: https://skills.stellar.org/ (Agent-readable docs for building on Stellar)
 - **On-Chain ZK Verifier Implementations**:
   * RISC Zero (Groth16): https://github.com/NethermindEth/stellar-risc0-verifier
