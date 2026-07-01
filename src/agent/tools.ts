@@ -342,7 +342,7 @@ export async function executeTool(
   console.log(`[Agent Tool] Executing tool: ${name} with args:`, args);
 
   // Rate limit all tool calls (except read-only balance/address checks)
-  const skipRateLimit = ["get_balances", "get_wallet_address", "check_activation"];
+  const skipRateLimit = ["get_balances", "get_wallet_address", "check_activation", "list_skills", "read_skill"];
   if (!skipRateLimit.includes(name)) {
     checkRateLimit(chatId);
   }
