@@ -6,11 +6,10 @@ FROM node:20-slim
 # Install System Dependencies
 # ============================================
 RUN apt-get update && apt-get install -y \
-  chromium-browser \
-  chromium-codecs-ffmpeg \
+  chromium \
   # Chromium deps
   libnss3 libxss1 libasound2 libxtst6 \
-  fonts-liberation libappindicator1 libindicator7 \
+  fonts-liberation \
   libgconf-2-4 libxrender1 libxrandr2 libxinerama1 \
   libxi6 libxcursor1 libxcomposite1 libxdamage1 \
   libxfixes3 libxext6 libdrm2 libgbm1 libxkbcommon0 \
@@ -38,7 +37,7 @@ RUN cargo install soroban-cli --locked
 # ============================================
 # Configure Node + Python + Puppeteer
 # ============================================
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_SKIP_VALIDATION=true
 ENV NODE_ENV=production
