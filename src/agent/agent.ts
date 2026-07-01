@@ -100,6 +100,16 @@ export async function runAgentLoop(
       console.log(`[Agent Loop] Executing tool: ${name} with args:`, args);
       
       try {
+        if (name === "deploy_custom_contract") {
+          const contractType = (args.contractType || "custom").toLowerCase();
+          if (contractType === "custom") {
+            const currentSkills = activeSkillCache.get(chatId) || [];
+            if (!currentSkills.some(s => s.skillName === "smart-contracts" || s.skillName.startsWith("oz-"))) {
+              throw new Error("SECURITY BLOCK: You attempted to deploy a custom contract without reading the syntax rules. You MUST call read_skill with 'smart-contracts' or an 'oz-' skill first to load the correct Soroban syntax and OpenZeppelin patterns into your context window. Do not guess the Rust code.");
+            }
+          }
+        }
+
         const toolResult = await executeTool(chatId, name, args, user);
         
         // Intercept read_skill to cache it permanently for this session
