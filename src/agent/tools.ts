@@ -7,6 +7,8 @@ import { compileRustContract } from "../services/compiler";
 import { prisma } from "../services/db";
 import crypto from "crypto";
 import { ethers } from "ethers";
+import fs from "fs";
+import path from "path";
 
 // ============================================================
 // HARDCODED SOROBAN v21.7.7 CONTRACT TEMPLATES
@@ -346,6 +348,60 @@ export async function executeTool(
   }
 
   switch (name) {
+    case "list_skills": {
+      const skillsDir = path.join(process.cwd(), ".agents/skills");
+      if (!fs.existsSync(skillsDir)) {
+        return "No skills directory found in the workspace.";
+      }
+      
+      const dirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+
+      return dirs.map(dirName => {
+        const skillFile = path.join(skillsDir, dirName, "SKILL.md");
+        const content = fs.existsSync(skillFile) ? fs.readFileSync(skillFile, "utf-8") : "";
+        const descMatch = content.match(/description:\s*(.+)/i);
+        return { name: dirName, description: descMatch?.[1] ?? "No description available" };
+      });
+    }
+
+    case "read_skill": {
+      const skillName = args.skillName;
+      if (!skillName || typeof skillName !== "string") {
+        return "Error: skillName must be a string.";
+      }
+
+      // 1. Regex validation (Belt)
+      if (!/^[a-z0-9-_]+$/i.test(skillName)) {
+        return `Error: Invalid skillName format "${skillName}".`;
+      }
+
+      const skillsDir = path.join(process.cwd(), ".agents/skills");
+      if (!fs.existsSync(skillsDir)) return "No skills directory found.";
+
+      // 2. Whitelist validation (Suspenders)
+      const validSkills = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+
+      if (!validSkills.includes(skillName)) {
+        return `Skill "${skillName}" not found. Available skills: ${validSkills.join(", ")}`;
+      }
+
+      // 3. Path traversal defense-in-depth
+      const filePath = path.join(skillsDir, skillName, "SKILL.md");
+      if (!filePath.startsWith(skillsDir)) {
+        return "Error: Path traversal detected.";
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return `Skill "${skillName}" directory exists, but is missing SKILL.md.`;
+      }
+
+      return fs.readFileSync(filePath, "utf-8");
+    }
+
     case "get_balances": {
       const stellarBalances = await stellar.getBalances(user.stellarPublic);
       const evmBalances = await evm.getEVMBalances(user.evmAddress);

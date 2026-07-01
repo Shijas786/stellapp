@@ -17,6 +17,16 @@ const openai = new OpenAI({ apiKey });
 // In-memory cache of user chat histories to preserve conversation context
 const chatHistories = new Map<string, OpenAI.Chat.ChatCompletionMessageParam[]>();
 
+type ActiveSkill = {
+  skillName: string;
+  content: string;
+  calledAt: number;
+};
+
+// In-memory cache of active skills (TTL 60 mins, max 3 per chat)
+// Note: Single-instance in-memory cache. Re-deploying will wipe pinned contexts.
+const activeSkillCache = new Map<string, ActiveSkill[]>();
+
 /**
  * Main AI agent runtime loop using OpenAI GPT-4o with tool calling capabilities.
  */
@@ -42,10 +52,32 @@ export async function runAgentLoop(
   // 2. Add new user query
   history.push({ role: "user", content: userMessage });
 
-  // 3. Request completion from OpenAI
+  // 3. Prepare dynamic system prompt with active skills
+  const baseSystemMessage = history[0];
+  let dynamicSystemContent = baseSystemMessage.content as string;
+
+  let activeSkills = activeSkillCache.get(chatId) || [];
+  const now = Date.now();
+  // Evict skills older than 60 minutes
+  activeSkills = activeSkills.filter(s => now - s.calledAt < 60 * 60 * 1000);
+  
+  if (activeSkills.length > 0) {
+    activeSkillCache.set(chatId, activeSkills);
+    const pinnedText = activeSkills.map(s => `[PINNED SKILL: ${s.skillName}]\n${s.content}`).join("\n\n---\n\n");
+    dynamicSystemContent += `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
+  } else {
+    activeSkillCache.delete(chatId);
+  }
+
+  const messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: dynamicSystemContent },
+    ...history.slice(1)
+  ];
+
+  // 4. Request completion from OpenAI
   let response = await openai.chat.completions.create({
     model: config.openaiModel,
-    messages: history,
+    messages: messagesForOpenAI,
     tools: OPENAI_TOOLS
   });
 
@@ -70,6 +102,16 @@ export async function runAgentLoop(
       try {
         const toolResult = await executeTool(chatId, name, args, user);
         
+        // Intercept read_skill to cache it permanently for this session
+        if (name === "read_skill" && typeof toolResult === "string" && !toolResult.startsWith("Error:") && !toolResult.includes("not found")) {
+          const skillName = args.skillName;
+          const currentSkills = activeSkillCache.get(chatId) || [];
+          const filteredSkills = currentSkills.filter(s => s.skillName !== skillName);
+          // Prepend new skill, cap array at 3 items
+          filteredSkills.unshift({ skillName, content: toolResult, calledAt: Date.now() });
+          activeSkillCache.set(chatId, filteredSkills.slice(0, 3));
+        }
+
         history.push({
           role: "tool",
           tool_call_id: toolCall.id,
@@ -87,10 +129,22 @@ export async function runAgentLoop(
       }
     }
 
+    // Re-evaluate active skills (in case one was just added)
+    activeSkills = activeSkillCache.get(chatId) || [];
+    if (activeSkills.length > 0) {
+      const pinnedText = activeSkills.map(s => `[PINNED SKILL: ${s.skillName}]\n${s.content}`).join("\n\n---\n\n");
+      dynamicSystemContent = (baseSystemMessage.content as string) + `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
+    }
+
+    const updatedMessagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: dynamicSystemContent },
+      ...history.slice(1)
+    ];
+
     // Call OpenAI again with the tool results added to the message log
     response = await openai.chat.completions.create({
       model: config.openaiModel,
-      messages: history,
+      messages: updatedMessagesForOpenAI,
       tools: OPENAI_TOOLS
     });
 
