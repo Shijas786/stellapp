@@ -7,7 +7,7 @@ const IS_MAINNET = process.env.STELLAR_NETWORK === "MAINNET";
 
 export const config = {
   isMainnet: IS_MAINNET,
-  openaiModel: process.env.OPENAI_MODEL || "gpt-5.5",
+  openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
   
   // Stellar configurations
   stellarHorizonUrl: IS_MAINNET 
