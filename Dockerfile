@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
   libpango-1.0-0 libpangoft2-1.0-0 libcups2 libdbus-1-3 \
   libglib2.0-0 libatspi2.0-0 dbus x11-utils \
   # Rust build dependencies
-  curl build-essential pkg-config libssl-dev \
+  curl build-essential pkg-config libssl-dev libdbus-1-dev \
   # Python for Whisper
   python3 python3-pip ffmpeg \
   --no-install-recommends && \
