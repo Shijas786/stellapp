@@ -188,7 +188,20 @@ export async function runAgentLoop(
   // 4. Memory Optimization: keep history at a manageable size (last 20 messages)
   if (history.length > 25) {
     const systemPrompt = history[0];
-    const recentHistory = history.slice(-20);
+    let sliceIndex = history.length - 20;
+    
+    // Find the nearest user message to start the slice safely
+    // This prevents slicing an assistant tool_calls message while keeping its orphaned tool responses
+    while (sliceIndex < history.length && history[sliceIndex].role !== "user") {
+      sliceIndex++;
+    }
+    
+    // Fallback if we couldn't find a user message
+    if (sliceIndex === history.length) {
+      sliceIndex = history.length - 20;
+    }
+
+    const recentHistory = history.slice(sliceIndex);
     chatHistories.set(chatId, [systemPrompt, ...recentHistory]);
   }
 
