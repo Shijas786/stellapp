@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "npx prisma db push --accept-data-loss && tsx src/index.ts",
-    "build:dashboard": "cd dashboard && npm install && npm run build",
+    "build:dashboard": "cd dashboard && npm install --include=dev && npm run build && ls -la out",
     "build": "tsc && npm run build:dashboard",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
