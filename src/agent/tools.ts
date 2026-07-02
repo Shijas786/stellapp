@@ -548,6 +548,8 @@ export async function executeTool(
 
       let isGhostOnboardedOnMainnet = false;
       let ghostSecret = "";
+      
+      let resolvedUser = null;
 
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
       if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
@@ -557,7 +559,7 @@ export async function executeTool(
           const cleanPhone = cleanedRecipient;
           console.log(`[Tools] Recipient is a phone number. Resolving: ${cleanPhone}`);
           
-          let resolved = await prisma.user.findFirst({
+          resolvedUser = await prisma.user.findFirst({
             where: {
               chatId: {
                 startsWith: cleanPhone
@@ -565,7 +567,7 @@ export async function executeTool(
             }
           });
 
-          if (!resolved) {
+          if (!resolvedUser) {
             console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly...`);
             
             // 1. Generate wallets
@@ -577,7 +579,7 @@ export async function executeTool(
             const encEVMPrivateKey = encrypt(newEVM.privateKey);
 
             // 3. Save to database (onboarded is false because they haven't chatted with the bot yet)
-            resolved = await prisma.user.create({
+            resolvedUser = await prisma.user.create({
               data: {
                 chatId: `${cleanPhone}@c.us`,
                 stellarPublic: newStellar.publicKey,
@@ -589,24 +591,33 @@ export async function executeTool(
             });
           }
 
-          // 4. Fund Stellar account if it is not activated on the ledger
-          const isActivated = await stellar.isAccountActivated(resolved.stellarPublic);
-          if (!isActivated) {
-            if (!config.isMainnet) {
-              console.log(`[Tools] Funding pre-created account on testnet: ${resolved.stellarPublic}`);
-              await stellar.fundStellarAccount(resolved.stellarPublic);
-              console.log(`[Tools] Establishing USDC trustline for pre-created account...`);
-              await stellar.ensureUSDCTrustline(decrypt(resolved.stellarSecret));
-            } else {
-              isGhostOnboardedOnMainnet = true;
-              ghostSecret = decrypt(resolved.stellarSecret);
-            }
-          }
-
-          console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolved.stellarPublic}`);
-          recipient = resolved.stellarPublic;
+          console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolvedUser.stellarPublic}`);
+          recipient = resolvedUser.stellarPublic;
         } else {
           throw new Error(`Recipient '${recipient}' is not a valid Stellar address (G...) or phone number.`);
+        }
+      } else if (recipient.startsWith("G")) {
+        // If it is a G address, check if it belongs to one of our users (for ghost onboarding)
+        resolvedUser = await prisma.user.findFirst({
+          where: {
+            stellarPublic: recipient
+          }
+        });
+      }
+
+      // 4. Fund Stellar account if it is not activated on the ledger AND it is one of our managed users
+      if (resolvedUser) {
+        const isActivated = await stellar.isAccountActivated(resolvedUser.stellarPublic);
+        if (!isActivated) {
+          if (!config.isMainnet) {
+            console.log(`[Tools] Funding pre-created account on testnet: ${resolvedUser.stellarPublic}`);
+            await stellar.fundStellarAccount(resolvedUser.stellarPublic);
+            console.log(`[Tools] Establishing USDC trustline for pre-created account...`);
+            await stellar.ensureUSDCTrustline(decrypt(resolvedUser.stellarSecret));
+          } else {
+            isGhostOnboardedOnMainnet = true;
+            ghostSecret = decrypt(resolvedUser.stellarSecret);
+          }
         }
       }
 
