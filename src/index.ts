@@ -142,8 +142,14 @@ http.createServer(async (_req, res) => {
     return;
   }
 
-  // Temporary route to fix existing orphaned accounts
+  // Admin-only route to fix existing orphaned accounts (requires secret token)
   if (_req.method === "GET" && parsedUrl.pathname === "/api/auth/fix-accounts") {
+    // Require the ENCRYPTION_KEY as a query param for security
+    if (query.secret !== token) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Forbidden" }));
+      return;
+    }
     try {
       const allUsers = await prisma.user.findMany();
       // Find short orphans (assumed to be the ones without country code)
@@ -182,9 +188,8 @@ http.createServer(async (_req, res) => {
         }
       }
       
-      const debugData = allUsers.map(u => ({ id: u.id, chatId: u.chatId, onboarded: u.onboarded }));
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, fixed, logs, debugData }));
+      res.end(JSON.stringify({ success: true, fixed, logs }));
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));

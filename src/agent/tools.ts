@@ -509,9 +509,21 @@ export async function executeTool(
       
       if (isPhone) {
         const cleanPhone = cleanedRecipient;
+        // Always search by suffix to match both short (9048696859) and long (919048696859) formats
         let resolved = await prisma.user.findFirst({
           where: { chatId: { endsWith: `${cleanPhone}@c.us` } }
         });
+
+        // Also check if cleanPhone is itself a suffix of an existing longer number
+        if (!resolved) {
+          const allUsers = await prisma.user.findMany({
+            where: { chatId: { endsWith: "@c.us" } }
+          });
+          resolved = allUsers.find(u => {
+            const num = u.chatId.replace("@c.us", "");
+            return num.endsWith(cleanPhone) || cleanPhone.endsWith(num);
+          }) ?? null;
+        }
 
         if (!resolved) {
           console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly for resolution...`);
@@ -521,15 +533,18 @@ export async function executeTool(
           const encStellarSecret = encrypt(newStellar.secretKey);
           const encEVMPrivateKey = encrypt(newEVM.privateKey);
 
-          resolved = await prisma.user.create({
-            data: {
+          // Use upsert so concurrent calls don't create two records for the same number
+          resolved = await prisma.user.upsert({
+            where: { chatId: `${cleanPhone}@c.us` },
+            create: {
               chatId: `${cleanPhone}@c.us`,
               stellarPublic: newStellar.publicKey,
               stellarSecret: encStellarSecret,
               evmAddress: newEVM.address,
               evmPrivateKey: encEVMPrivateKey,
               onboarded: false
-            }
+            },
+            update: {} // no-op if already exists
           });
           
           return `Recipient resolved successfully. A new wallet was automatically generated for them.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
@@ -567,6 +582,17 @@ export async function executeTool(
             }
           });
 
+          // Also check reverse: maybe cleanPhone is a suffix of an existing longer number
+          if (!resolvedUser) {
+            const allPhoneUsers = await prisma.user.findMany({
+              where: { chatId: { endsWith: "@c.us" } }
+            });
+            resolvedUser = allPhoneUsers.find(u => {
+              const num = u.chatId.replace("@c.us", "");
+              return num.endsWith(cleanPhone) || cleanPhone.endsWith(num);
+            }) ?? null;
+          }
+
           if (!resolvedUser) {
             console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly...`);
             
@@ -578,16 +604,18 @@ export async function executeTool(
             const encStellarSecret = encrypt(newStellar.secretKey);
             const encEVMPrivateKey = encrypt(newEVM.privateKey);
 
-            // 3. Save to database (onboarded is false because they haven't chatted with the bot yet)
-            resolvedUser = await prisma.user.create({
-              data: {
+            // 3. Use upsert to prevent race-condition duplicates
+            resolvedUser = await prisma.user.upsert({
+              where: { chatId: `${cleanPhone}@c.us` },
+              create: {
                 chatId: `${cleanPhone}@c.us`,
                 stellarPublic: newStellar.publicKey,
                 stellarSecret: encStellarSecret,
                 evmAddress: newEVM.address,
                 evmPrivateKey: encEVMPrivateKey,
                 onboarded: false
-              }
+              },
+              update: {} // no-op if already exists
             });
           }
 

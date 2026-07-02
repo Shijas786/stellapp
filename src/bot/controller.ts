@@ -18,25 +18,40 @@ export async function handleIncomingMessage(
     where: { chatId }
   });
 
-  // Healing logic: If user is not found, check if there's an orphaned account created by tools.ts
-  if (!user) {
+  // Healing logic: If user is not found by exact chatId, look for a pre-created "ghost" account
+  // that tools.ts may have created with a shorter/different phone format.
+  // We ONLY heal if the chatId ends with @c.us (real phone) and the raw number is a suffix match
+  // of an existing record. This avoids false merges between different phone numbers.
+  if (!user && chatId.endsWith("@c.us")) {
     const rawNumber = chatId.replace("@c.us", "");
-    const localNumber = rawNumber.length >= 10 ? rawNumber.slice(-10) : rawNumber;
+
+    // Find any orphan whose chatId ends with the same full number (catches country-code variants)
     const possibleOrphan = await prisma.user.findFirst({
       where: {
-        chatId: {
-          endsWith: `${localNumber}@c.us`
-        },
-        onboarded: false
+        AND: [
+          { chatId: { endsWith: `${rawNumber}@c.us` } },
+          { onboarded: false }
+        ]
       }
     });
 
+    // Safety: only merge if the orphan's number IS a suffix of ours (avoids partial collisions)
     if (possibleOrphan) {
-      console.log(`[Controller] Healing orphaned account: ${possibleOrphan.chatId} -> ${chatId}`);
-      user = await prisma.user.update({
-        where: { id: possibleOrphan.id },
-        data: { chatId: chatId }
-      });
+      const orphanNumber = possibleOrphan.chatId.replace("@c.us", "");
+      const isValidSuffix = rawNumber.endsWith(orphanNumber) || orphanNumber.endsWith(rawNumber);
+      if (isValidSuffix) {
+        console.log(`[Controller] Healing orphaned account: ${possibleOrphan.chatId} -> ${chatId}`);
+        try {
+          user = await prisma.user.update({
+            where: { id: possibleOrphan.id },
+            data: { chatId: chatId }
+          });
+        } catch (healErr: any) {
+          // If another row with this chatId was created in a race, just fetch it
+          console.error(`[Controller] Healing update failed (race condition?):`, healErr.message);
+          user = await prisma.user.findUnique({ where: { chatId } });
+        }
+      }
     }
   }
 
@@ -73,18 +88,32 @@ export async function handleIncomingMessage(
       const encryptedStellarSecret = encrypt(stellarWallet.secretKey);
       const encryptedEVMPrivateKey = encrypt(evmWallet.privateKey);
 
-      // Save to Database
-      user = await prisma.user.create({
-        data: {
-          chatId,
-          username: defaultUsername,
-          stellarPublic: stellarWallet.publicKey,
-          stellarSecret: encryptedStellarSecret,
-          evmAddress: evmWallet.address,
-          evmPrivateKey: encryptedEVMPrivateKey,
-          onboarded: true
-        }
-      });
+      // Use upsert to guard against race conditions where two simultaneous messages
+      // from the same user could attempt to insert the same chatId twice.
+      try {
+        user = await prisma.user.upsert({
+          where: { chatId },
+          create: {
+            chatId,
+            username: defaultUsername,
+            stellarPublic: stellarWallet.publicKey,
+            stellarSecret: encryptedStellarSecret,
+            evmAddress: evmWallet.address,
+            evmPrivateKey: encryptedEVMPrivateKey,
+            onboarded: true
+          },
+          update: {
+            // If record somehow already exists (race), just mark as onboarded
+            onboarded: true,
+            username: defaultUsername ?? undefined
+          }
+        });
+      } catch (createErr: any) {
+        // Last-resort fallback: if upsert itself fails, fetch the existing record
+        console.error(`[Controller] upsert failed, fetching existing record:`, createErr.message);
+        user = await prisma.user.findUnique({ where: { chatId } });
+        if (!user) throw createErr;
+      }
       console.log(`[Controller] New user wallet created: ${user.stellarPublic}`);
     } else {
       // Update existing pre-created user to onboarded = true
