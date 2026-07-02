@@ -155,6 +155,33 @@ http.createServer(async (_req, res) => {
     }
   }
 
+  // 3.5 Serve Next.js Dashboard
+  if (parsedUrl.pathname?.startsWith("/dashboard")) {
+    let targetPath = parsedUrl.pathname;
+    if (targetPath === "/dashboard" || targetPath === "/dashboard/") {
+      targetPath = "/dashboard/index.html";
+    } else if (!path.extname(targetPath)) {
+      targetPath += ".html";
+    }
+    
+    const dashboardPath = path.join(process.cwd(), "dashboard", "out", targetPath);
+    if (fs.existsSync(dashboardPath)) {
+      const ext = path.extname(dashboardPath);
+      let contentType = "text/html; charset=utf-8";
+      if (ext === ".css") contentType = "text/css";
+      else if (ext === ".js") contentType = "application/javascript";
+      else if (ext === ".png") contentType = "image/png";
+      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+      else if (ext === ".svg") contentType = "image/svg+xml";
+      else if (ext === ".json") contentType = "application/json";
+      else if (ext === ".txt") contentType = "text/plain";
+      
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(fs.readFileSync(dashboardPath));
+      return;
+    }
+  }
+
   // 4. Serve Public Assets (CSS, JS, Images)
   if (parsedUrl.pathname?.startsWith("/assets/")) {
     const assetPath = path.join(process.cwd(), "public", parsedUrl.pathname.replace("/assets/", ""));
