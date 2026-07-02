@@ -49,7 +49,7 @@ export default function LoginPage() {
         // Handle successful login (store token, redirect to dashboard)
         localStorage.setItem('stellapp_token', data.token);
         alert('Login Successful! Redirecting to Dashboard...');
-        // window.location.href = '/dashboard';
+        window.location.href = '/dashboard/home';
       } else {
         setError(data.error || 'Invalid OTP');
       }
