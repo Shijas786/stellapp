@@ -181,8 +181,9 @@ http.createServer(async (_req, res) => {
         }
       }
       
+      const debugData = allUsers.map(u => ({ id: u.id, chatId: u.chatId, onboarded: u.onboarded }));
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, fixed, logs }));
+      res.end(JSON.stringify({ success: true, fixed, logs, debugData }));
     } catch (err: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
