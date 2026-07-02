@@ -566,6 +566,41 @@ export async function executeTool(
       
       let resolvedUser = null;
 
+      // Step 0: Contact name lookup — if recipient is not a G/C address or phone number,
+      // treat it as a contact name and look up the phone number from the DB.
+      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
+        const isPhone = /^[0-9]{10,18}$/.test(cleanedForPhone);
+        
+        if (!isPhone) {
+          // It's a name — look up in contacts table (case-insensitive)
+          const contact = await prisma.contact.findFirst({
+            where: {
+              ownerId: user.id,
+              name: { equals: recipient.toLowerCase() }
+            }
+          });
+          
+          // Fuzzy fallback: partial name match
+          if (!contact) {
+            const allContacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
+            const matched = allContacts.find(c => 
+              c.name.includes(recipient.toLowerCase()) || 
+              recipient.toLowerCase().includes(c.name)
+            );
+            if (matched) {
+              console.log(`[Tools] Resolved contact name "${recipient}" -> phone ${matched.phoneNumber}`);
+              recipient = matched.phoneNumber;
+            } else {
+              throw new Error(`Contact "${recipient}" not found in your address book. Please save their number first or provide their phone number directly.`);
+            }
+          } else {
+            console.log(`[Tools] Resolved contact name "${recipient}" -> phone ${contact.phoneNumber}`);
+            recipient = contact.phoneNumber;
+          }
+        }
+      }
+
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
       if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
         const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
@@ -573,6 +608,7 @@ export async function executeTool(
         if (isPhone) {
           const cleanPhone = cleanedRecipient;
           console.log(`[Tools] Recipient is a phone number. Resolving: ${cleanPhone}`);
+
           
           resolvedUser = await prisma.user.findFirst({
             where: {
