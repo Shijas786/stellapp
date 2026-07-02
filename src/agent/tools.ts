@@ -1103,54 +1103,59 @@ export async function executeTool(
 
     case "confidential_register": {
       const stellarSecret = decrypt(user.stellarSecret);
-      await sendNotification(chatId, "⏳ *Generating registration ZK proof...*\n\nThis involves deriving your confidential spending/viewing keys and submitting a ZK registration proof to the Stellar contract. It takes 15-20 seconds.");
-      const txHash = await confidentialToken.registerConfidential(stellarSecret);
+      const assetCode = (args.asset || "XLM").toUpperCase();
+      await sendNotification(chatId, `⏳ *Generating registration ZK proof for ${assetCode}...*\n\nThis involves deriving your confidential spending/viewing keys and submitting a ZK registration proof to the Stellar contract. It takes 15-20 seconds.`);
+      const txHash = await confidentialToken.registerConfidential(stellarSecret, assetCode);
       return {
         success: true,
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        message: `Successfully registered for ZK confidential transfers! 🎉\n\nTx: ${txHash.slice(0, 8)}...`
+        message: `Successfully registered for ZK confidential transfers of ${assetCode}! 🎉\n\nTx: ${txHash.slice(0, 8)}...`
       };
     }
 
     case "confidential_deposit": {
       const stellarSecret = decrypt(user.stellarSecret);
       const amountStr = args.amount;
-      await sendNotification(chatId, `⏳ *Depositing ${amountStr} XLM into ZK receiving balance...*`);
-      const txHash = await confidentialToken.depositConfidential(stellarSecret, amountStr);
+      const assetCode = (args.asset || "XLM").toUpperCase();
+      await sendNotification(chatId, `⏳ *Depositing ${amountStr} ${assetCode} into ZK receiving balance...*`);
+      const txHash = await confidentialToken.depositConfidential(stellarSecret, amountStr, assetCode);
       return {
         success: true,
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        message: `Successfully deposited ${amountStr} XLM into your confidential receiving balance! 🤫\n\n*Note*: You must call "merge" to fold this receiving balance into your spendable balance before you can spend it.`
+        message: `Successfully deposited ${amountStr} ${assetCode} into your confidential receiving balance! 🤫\n\n*Note*: You must call "merge" to fold this receiving balance into your spendable balance before you can spend it.`
       };
     }
 
     case "confidential_merge": {
       const stellarSecret = decrypt(user.stellarSecret);
-      await sendNotification(chatId, "⏳ *Merging receiving balance into spendable...*");
-      const txHash = await confidentialToken.mergeConfidential(stellarSecret);
+      const assetCode = (args.asset || "XLM").toUpperCase();
+      await sendNotification(chatId, `⏳ *Merging receiving balance into spendable for ${assetCode}...*`);
+      const txHash = await confidentialToken.mergeConfidential(stellarSecret, assetCode);
       return {
         success: true,
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        message: "Successfully folded receiving balance into your spendable balance! 🤫"
+        message: `Successfully folded receiving balance of ${assetCode} into your spendable balance! 🤫`
       };
     }
 
     case "confidential_balance": {
       const stellarSecret = decrypt(user.stellarSecret);
-      const balances = await confidentialToken.getConfidentialBalances(stellarSecret);
+      const assetCode = (args.asset || "XLM").toUpperCase();
+      const balances = await confidentialToken.getConfidentialBalances(stellarSecret, assetCode);
       return {
         success: true,
         ...balances,
-        message: `*🔒 ZK Private Balance*\n\n• *Spendable*: ${balances.spendable} XLM\n• *Receiving*: ${balances.receiving} XLM\n\n• *Registered*: ${balances.registered ? "Yes ✅" : "No ❌"}`
+        message: `*🔒 ZK Private Balance (${assetCode})*\n\n• *Spendable*: ${balances.spendable} ${assetCode}\n• *Receiving*: ${balances.receiving} ${assetCode}\n\n• *Registered*: ${balances.registered ? "Yes ✅" : "No ❌"}`
       };
     }
 
     case "confidential_transfer": {
       const stellarSecret = decrypt(user.stellarSecret);
       const amountStr = args.amount;
+      const assetCode = (args.asset || "XLM").toUpperCase();
       let recipient = args.recipient.trim().replace(/^@/, "");
 
       // Resolve contact name to phone number
@@ -1210,14 +1215,14 @@ export async function executeTool(
         }
       }
 
-      await sendNotification(chatId, `⏳ *Generating ZK proof for private transfer of ${amountStr} XLM...*\n\nThis derives ephemeral ECDH keys and solves UltraHonk witnesses. It takes 15-20 seconds.`);
-      const txHash = await confidentialToken.transferConfidential(stellarSecret, recipient, amountStr);
+      await sendNotification(chatId, `⏳ *Generating ZK proof for private transfer of ${amountStr} ${assetCode}...*\n\nThis derives ephemeral ECDH keys and solves UltraHonk witnesses. It takes 15-20 seconds.`);
+      const txHash = await confidentialToken.transferConfidential(stellarSecret, recipient, amountStr, assetCode);
       
       return {
         success: true,
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        message: `Successfully transferred ${amountStr} XLM privately! 🔒\n\nThe transaction is finalized on-chain with hidden amounts and balances.`
+        message: `Successfully transferred ${amountStr} ${assetCode} privately! 🔒\n\nThe transaction is finalized on-chain with hidden amounts and balances.`
       };
     }
 
@@ -1225,15 +1230,16 @@ export async function executeTool(
       const stellarSecret = decrypt(user.stellarSecret);
       const amountStr = args.amount;
       const recipient = args.recipient;
+      const assetCode = (args.asset || "XLM").toUpperCase();
 
-      await sendNotification(chatId, `⏳ *Generating ZK proof for confidential withdrawal of ${amountStr} XLM...*\n\nThis solves the UltraHonk withdraw witness. It takes 15-20 seconds.`);
-      const txHash = await confidentialToken.withdrawConfidential(stellarSecret, recipient, amountStr);
+      await sendNotification(chatId, `⏳ *Generating ZK proof for confidential withdrawal of ${amountStr} ${assetCode}...*\n\nThis solves the UltraHonk withdraw witness. It takes 15-20 seconds.`);
+      const txHash = await confidentialToken.withdrawConfidential(stellarSecret, recipient, amountStr, assetCode);
 
       return {
         success: true,
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        message: `Successfully withdrew ${amountStr} XLM confidentially to public address ${recipient}! 🔓\n\nTx: ${txHash.slice(0, 8)}...`
+        message: `Successfully withdrew ${amountStr} ${assetCode} confidentially to public address ${recipient}! 🔓\n\nTx: ${txHash.slice(0, 8)}...`
       };
     }
 

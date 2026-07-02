@@ -19,3 +19,8 @@ compiler_template/target/
 # Exception: ZK circuits must ship to production
 !circuits/
 !circuits/**
+
+# Exception: dynamic confidential token WASMs
+!contracts_wasm/
+!contracts_wasm/**
+

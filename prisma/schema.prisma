@@ -47,3 +47,12 @@ model PrivacyDeposit {
   spent         Boolean  @default(false)
   createdAt     DateTime @default(now())
 }
+
+// Registry for deployed OpenZeppelin Confidential Token wrappers per asset
+model ConfidentialRegistry {
+  assetCode        String   @id // e.g. "XLM" or "USDC"
+  tokenContract    String
+  verifierContract String
+  auditorContract  String
+  deployedAt       DateTime @default(now())
+}

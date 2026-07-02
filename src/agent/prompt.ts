@@ -444,20 +444,33 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "confidential_register",
-      description: "Register the user's account for confidential transfers by binding Grumpkin public keys to the contract."
+      description: "Register the user's account for confidential transfers by binding Grumpkin public keys to the contract.",
+      parameters: {
+        type: "object",
+        properties: {
+          asset: {
+            type: "string",
+            description: "The token asset to register (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
+          }
+        }
+      }
     }
   },
   {
     type: "function",
     function: {
       name: "confidential_deposit",
-      description: "Deposit public XLM from the user's wallet into their confidential receiving balance.",
+      description: "Deposit public tokens from the user's wallet into their confidential receiving balance.",
       parameters: {
         type: "object",
         properties: {
           amount: {
             type: "string",
-            description: "The amount of XLM to deposit (e.g. '10.5')"
+            description: "The amount of tokens to deposit (e.g. '10.5')"
+          },
+          asset: {
+            type: "string",
+            description: "The token asset to deposit (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
           }
         },
         required: ["amount"]
@@ -468,21 +481,39 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "confidential_merge",
-      description: "Merge the user's receiving confidential balance into their spendable confidential balance."
+      description: "Merge the user's receiving confidential balance into their spendable confidential balance.",
+      parameters: {
+        type: "object",
+        properties: {
+          asset: {
+            type: "string",
+            description: "The token asset to merge (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
+          }
+        }
+      }
     }
   },
   {
     type: "function",
     function: {
       name: "confidential_balance",
-      description: "Get the user's current private spendable and receiving balances."
+      description: "Get the user's current private spendable and receiving balances.",
+      parameters: {
+        type: "object",
+        properties: {
+          asset: {
+            type: "string",
+            description: "The token asset to check (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
+          }
+        }
+      }
     }
   },
   {
     type: "function",
     function: {
       name: "confidential_transfer",
-      description: "Transfer XLM confidentially to another user's account (sender, recipient, and amount are private).",
+      description: "Transfer tokens confidentially to another user's account (sender, recipient, and amount are private).",
       parameters: {
         type: "object",
         properties: {
@@ -492,7 +523,11 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           },
           amount: {
             type: "string",
-            description: "The amount of XLM to transfer privately (e.g. '5.0')"
+            description: "The amount of tokens to transfer privately (e.g. '5.0')"
+          },
+          asset: {
+            type: "string",
+            description: "The token asset to transfer (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
           }
         },
         required: ["recipient", "amount"]
@@ -503,17 +538,21 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "confidential_withdraw",
-      description: "Withdraw public XLM from the user's private spendable balance back to a public address.",
+      description: "Withdraw public tokens from the user's private spendable balance back to a public address.",
       parameters: {
         type: "object",
         properties: {
           recipient: {
             type: "string",
-            description: "The Stellar G-address to receive the public XLM."
+            description: "The Stellar G-address to receive the public tokens."
           },
           amount: {
             type: "string",
-            description: "The amount of XLM to withdraw (e.g. '15.0')"
+            description: "The amount of tokens to withdraw (e.g. '15.0')"
+          },
+          asset: {
+            type: "string",
+            description: "The token asset to withdraw (e.g. 'USDC' or 'XLM'). Defaults to 'XLM'."
           }
         },
         required: ["recipient", "amount"]

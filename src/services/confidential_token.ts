@@ -1,8 +1,9 @@
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, Asset, Networks } from "@stellar/stellar-sdk";
 import crypto from "crypto";
 import path from "path";
 import { config } from "./config";
 import { prisma } from "./db";
+import { USDC_ASSET } from "./stellar";
 import { ChainClient, keypairSigner } from "../zk/chain/client";
 import { pointFromBytes, type Point } from "../zk/crypto/grumpkin";
 import { deriveKeys, type KeyPair } from "../zk/crypto/keys";
@@ -54,23 +55,109 @@ function getTransferProver() {
 }
 
 /**
- * Initialize RPC ChainClient for Soroban interactions
+ * Get or deploy the confidential token wrapper contracts for a given assetCode.
  */
-export function getChainClient(): ChainClient {
+export async function getOrDeployConfidentialToken(
+  secretKey: string,
+  assetCode: string
+): Promise<{ token: string; verifier: string; auditor: string }> {
+  const code = assetCode.toUpperCase();
+
+  // 1. Check if already registered/deployed
+  const existing = await prisma.confidentialRegistry.findUnique({
+    where: { assetCode: code }
+  });
+  if (existing) {
+    return {
+      token: existing.tokenContract,
+      verifier: existing.verifierContract,
+      auditor: existing.auditorContract
+    };
+  }
+
+  // 2. Fallback to hardcoded pre-deployed contracts for XLM
+  if (code === "XLM") {
+    const registry = await prisma.confidentialRegistry.create({
+      data: {
+        assetCode: "XLM",
+        tokenContract: CONFIDENTIAL_CONTRACTS.token,
+        verifierContract: CONFIDENTIAL_CONTRACTS.verifier,
+        auditorContract: CONFIDENTIAL_CONTRACTS.auditor
+      }
+    });
+    return {
+      token: registry.tokenContract,
+      verifier: registry.verifierContract,
+      auditor: registry.auditorContract
+    };
+  }
+
+  // 3. Deploy dynamically on-chain using CLI
+  const kp = Keypair.fromSecret(secretKey);
+  const underlyingAsset = code === "USDC" ? USDC_ASSET : new Asset(code, kp.publicKey());
+  const underlyingContractId = underlyingAsset.contractId(config.stellarPassphrase);
+
+  console.log(`[ZK] Deploying new ConfidentialToken wrapper for ${code}...`);
+  console.log(`[ZK] Underlying asset contract: ${underlyingContractId}`);
+
+  const verifier = CONFIDENTIAL_CONTRACTS.verifier;
+  const auditor = CONFIDENTIAL_CONTRACTS.auditor;
+  const wasmPath = path.join(process.cwd(), "contracts_wasm", "confidential_token.wasm");
+
+  const cmd = `stellar contract deploy \
+    --wasm "${wasmPath}" \
+    --source-account "${secretKey}" \
+    --network testnet \
+    --optimize=false \
+    -- \
+    --underlying_asset "${underlyingContractId}" \
+    --verifier "${verifier}" \
+    --auditor "${auditor}"`;
+
+  const { execSync } = require("child_process");
+  const out = execSync(cmd, { encoding: "utf8" });
+
+  const token = out.split(/\s+/).filter(Boolean).pop()!;
+  if (!token || !token.startsWith("C")) {
+    throw new Error(`Unexpected contract deployment output: ${out}`);
+  }
+
+  console.log(`[ZK] Deployed ConfidentialToken wrapper for ${code} at: ${token}`);
+
+  const registry = await prisma.confidentialRegistry.create({
+    data: {
+      assetCode: code,
+      tokenContract: token,
+      verifierContract: verifier,
+      auditorContract: auditor
+    }
+  });
+
+  return {
+    token: registry.tokenContract,
+    verifier: registry.verifierContract,
+    auditor: registry.auditorContract
+  };
+}
+
+/**
+ * Initialize RPC ChainClient for dynamic token contract ID
+ */
+export function getChainClient(contracts: { token: string; verifier: string; auditor: string }): ChainClient {
   return new ChainClient({
     rpcUrl: config.stellarRpcUrl,
     networkPassphrase: config.stellarPassphrase,
-    contracts: CONFIDENTIAL_CONTRACTS
+    contracts
   });
 }
 
 /**
  * Derives the deterministic Grumpkin private spending key (sk) from a user's Stellar secret key
  */
-export function deriveConfidentialKeys(stellarSecret: string): KeyPair {
-  const addrF = addressToField(CONFIDENTIAL_CONTRACTS.token);
+export function deriveConfidentialKeys(stellarSecret: string, tokenAddress: string): KeyPair {
+  const addrF = addressToField(tokenAddress);
   const hash = crypto.createHash("sha256")
-    .update(stellarSecret + ":confidential-token-v1")
+    .update(stellarSecret + ":" + tokenAddress + ":confidential-token-v2")
     .digest();
   
   let v = 0n;
@@ -84,24 +171,25 @@ export function deriveConfidentialKeys(stellarSecret: string): KeyPair {
 /**
  * Register a user's confidential viewing/spending keys on-chain.
  */
-export async function registerConfidential(secretKey: string): Promise<string> {
+export async function registerConfidential(secretKey: string, assetCode: string): Promise<string> {
   const kp = Keypair.fromSecret(secretKey);
   const publicKey = kp.publicKey();
   
-  const client = getChainClient();
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
   const signer = keypairSigner(secretKey, config.stellarPassphrase);
   
   // 1. Check if already registered
   const onchainAccount = await client.confidentialBalance(publicKey);
   if (onchainAccount) {
-    return "User is already registered for confidential transfers.";
+    return `User is already registered for confidential transfers in ${assetCode}.`;
   }
 
   // 2. Generate registration ZK proof
-  const keys = deriveConfidentialKeys(secretKey);
+  const keys = deriveConfidentialKeys(secretKey, contracts.token);
   const w = buildRegisterWitness(keys);
   
-  console.log(`[ZK] Generating registration proof for ${publicKey}...`);
+  console.log(`[ZK] Generating registration proof for ${publicKey} (${assetCode})...`);
   const prover = getRegisterProver();
   const { proof } = await prover.prove(w.inputs);
 
@@ -111,18 +199,19 @@ export async function registerConfidential(secretKey: string): Promise<string> {
 }
 
 /**
- * Deposit public XLM into the user's confidential receiving balance.
+ * Deposit public tokens into the user's confidential receiving balance.
  */
-export async function depositConfidential(secretKey: string, amount: string): Promise<string> {
+export async function depositConfidential(secretKey: string, amount: string, assetCode: string): Promise<string> {
   const kp = Keypair.fromSecret(secretKey);
   const publicKey = kp.publicKey();
   
-  const client = getChainClient();
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
   const signer = keypairSigner(secretKey, config.stellarPassphrase);
   
   const scaledAmount = BigInt(Math.floor(parseFloat(amount) * 10000000)); // 7 decimals
   
-  console.log(`[ZK] Depositing ${amount} XLM into confidential balance for ${publicKey}...`);
+  console.log(`[ZK] Depositing ${amount} ${assetCode} into confidential balance for ${publicKey}...`);
   const result = await submitDeposit(client, signer, publicKey, publicKey, scaledAmount);
   return result.hash;
 }
@@ -130,14 +219,15 @@ export async function depositConfidential(secretKey: string, amount: string): Pr
 /**
  * Merge user's receiving balance into their spendable balance.
  */
-export async function mergeConfidential(secretKey: string): Promise<string> {
+export async function mergeConfidential(secretKey: string, assetCode: string): Promise<string> {
   const kp = Keypair.fromSecret(secretKey);
   const publicKey = kp.publicKey();
   
-  const client = getChainClient();
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
   const signer = keypairSigner(secretKey, config.stellarPassphrase);
   
-  console.log(`[ZK] Merging receiving balance into spendable for ${publicKey}...`);
+  console.log(`[ZK] Merging receiving balance into spendable for ${publicKey} (${assetCode})...`);
   const result = await submitMerge(client, signer, publicKey);
   return result.hash;
 }
@@ -145,12 +235,16 @@ export async function mergeConfidential(secretKey: string): Promise<string> {
 /**
  * Get a user's current spendable and receiving balances from their on-chain events.
  */
-export async function getConfidentialBalances(secretKey: string): Promise<{ spendable: string; receiving: string; registered: boolean }> {
+export async function getConfidentialBalances(
+  secretKey: string,
+  assetCode: string
+): Promise<{ spendable: string; receiving: string; registered: boolean }> {
   const kp = Keypair.fromSecret(secretKey);
   const publicKey = kp.publicKey();
   
-  const client = getChainClient();
-  const keys = deriveConfidentialKeys(secretKey);
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
+  const keys = deriveConfidentialKeys(secretKey, contracts.token);
   
   const engine = new StateEngine({
     client,
@@ -170,19 +264,21 @@ export async function getConfidentialBalances(secretKey: string): Promise<{ spen
 }
 
 /**
- * Transfer XLM privately from one user to another.
+ * Transfer tokens privately from one user to another.
  */
 export async function transferConfidential(
   secretKey: string,
   recipientAddress: string,
-  amount: string
+  amount: string,
+  assetCode: string
 ): Promise<string> {
   const kp = Keypair.fromSecret(secretKey);
   const senderPublic = kp.publicKey();
   
-  const client = getChainClient();
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
   const signer = keypairSigner(secretKey, config.stellarPassphrase);
-  const senderKeys = deriveConfidentialKeys(secretKey);
+  const senderKeys = deriveConfidentialKeys(secretKey, contracts.token);
   
   // 1. Get recipient viewing key from the contract
   const recipientOnchain = await client.confidentialBalance(recipientAddress);
@@ -207,7 +303,7 @@ export async function transferConfidential(
 
   const scaledAmount = BigInt(Math.floor(parseFloat(amount) * 10000000));
   if (senderState.spendable.v < scaledAmount) {
-    throw new Error(`Insufficient spendable confidential balance. Available: ${(Number(senderState.spendable.v) / 10000000).toFixed(7)} XLM.`);
+    throw new Error(`Insufficient spendable confidential balance. Available: ${(Number(senderState.spendable.v) / 10000000).toFixed(7)} ${assetCode}.`);
   }
 
   // 4. Build transfer witness & ZK proof
@@ -221,7 +317,7 @@ export async function transferConfidential(
     kAudS: kAud
   });
 
-  console.log(`[ZK] Generating confidential transfer proof of ${amount} XLM to ${recipientAddress}...`);
+  console.log(`[ZK] Generating confidential transfer proof of ${amount} ${assetCode} to ${recipientAddress}...`);
   const prover = getTransferProver();
   const { proof } = await prover.prove(w.inputs);
 
@@ -240,14 +336,16 @@ export async function transferConfidential(
 export async function withdrawConfidential(
   secretKey: string,
   recipientAddress: string,
-  amount: string
+  amount: string,
+  assetCode: string
 ): Promise<string> {
   const kp = Keypair.fromSecret(secretKey);
   const senderPublic = kp.publicKey();
   
-  const client = getChainClient();
+  const contracts = await getOrDeployConfidentialToken(secretKey, assetCode);
+  const client = getChainClient(contracts);
   const signer = keypairSigner(secretKey, config.stellarPassphrase);
-  const senderKeys = deriveConfidentialKeys(secretKey);
+  const senderKeys = deriveConfidentialKeys(secretKey, contracts.token);
   
   // 1. Fetch auditor key
   const kAud = await client.auditorKey(AUDITOR_ID);
@@ -264,7 +362,7 @@ export async function withdrawConfidential(
 
   const scaledAmount = BigInt(Math.floor(parseFloat(amount) * 10000000));
   if (senderState.spendable.v < scaledAmount) {
-    throw new Error(`Insufficient spendable confidential balance. Available: ${(Number(senderState.spendable.v) / 10000000).toFixed(7)} XLM.`);
+    throw new Error(`Insufficient spendable confidential balance. Available: ${(Number(senderState.spendable.v) / 10000000).toFixed(7)} ${assetCode}.`);
   }
 
   const w = buildWithdrawWitness({
@@ -275,7 +373,7 @@ export async function withdrawConfidential(
     kAudS: kAud
   });
 
-  console.log(`[ZK] Generating confidential withdrawal proof of ${amount} XLM...`);
+  console.log(`[ZK] Generating confidential withdrawal proof of ${amount} ${assetCode}...`);
   const prover = getWithdrawProver();
   const { proof } = await prover.prove(w.inputs);
 
