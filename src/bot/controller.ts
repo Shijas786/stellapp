@@ -60,11 +60,17 @@ export async function handleIncomingMessage(
   if (isNewUser) {
     const cleanText = text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "");
     if (cleanText !== "create wallet") {
-      return `👋 *Welcome to Stellapp!* 🚀\n\n` +
-        `Your personal zero-knowledge crypto companion, right inside WhatsApp. \n\n` +
-        `Manage assets, swap tokens on the Stellar DEX, perform private ZK transfers, and deploy smart contracts—all with zero gas fees. 🎙️\n\n` +
-        `To get started and generate your secure Stellar wallet, please reply:\n` +
-        `👉 *"create wallet"*`;
+      return `🚀 *Welcome to Stellapp*\n\n` +
+        `The easiest way to use Stellar—right from WhatsApp.\n\n` +
+        `✨ Create your wallet\n` +
+        `💸 Send & receive crypto\n` +
+        `🔄 Swap assets instantly\n` +
+        `📜 Deploy smart contracts\n` +
+        `🤝 Secure payments with escrow\n` +
+        `🔒 Private blockchain transactions\n` +
+        `🤖 AI assistance whenever you need it\n\n` +
+        `Everything happens through a simple chat.\n\n` +
+        `Reply with *create wallet* to begin.`;
     }
 
     console.log(`[Controller] Creating wallet for user: ${chatId} (${contactName})`);
