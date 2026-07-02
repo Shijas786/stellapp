@@ -189,7 +189,7 @@ http.createServer(async (_req, res) => {
           debugInfo += `<br>The dashboard/out folder DOES NOT EXIST!`;
         }
       } catch (err) {
-        debugInfo += `<br>Error checking folder: ${err.message}`;
+        debugInfo += `<br>Error checking folder: ${(err as Error).message}`;
       }
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(`<h2>Dashboard Not Found</h2><p>${debugInfo}</p><p>Please run <code>npm run build</code> to build the Next.js dashboard first.</p>`);
