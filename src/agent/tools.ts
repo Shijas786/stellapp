@@ -915,7 +915,16 @@ export async function executeTool(
           messages: [
             {
               role: "system",
-              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully. VERY IMPORTANT RULES:\n1. Use `soroban_sdk::Vec::new(&env)` instead of `vec![]` and use `vec.push_back(val)` instead of `vec.push(val)`.\n2. Do NOT use `Symbol::from_str`. Use `soroban_sdk::symbol_short!(\"str\")` instead of `Symbol::short`.\n3. Always use `soroban_sdk::Address` for addresses, never `symbol::address` or `Address::from_str`.\n4. Panic using `panic!(\"msg\")`, do not use `panic_with_error` unless defined.\n5. NEVER use `env.storage().get()` or `env.storage().set()`. You MUST specify the storage type: `env.storage().instance().set(&key, &val)` or `env.storage().persistent().get(&key)`.\n6. For contractimpl traits, do NOT name your struct the same as a trait.\n7. NEVER use `env.invoker()`. To authorize, pass an `Address` as a parameter and call `address.require_auth()`."
+              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully. VERY IMPORTANT RULES:\n" +
+                "1. Use `soroban_sdk::Vec::new(&env)` instead of `vec![]` and use `vec.push_back(val)` instead of `vec.push(val)`.\n" +
+                "2. `symbol_short!(\"...\")` ONLY supports strings up to 9 characters! For symbols longer than 9 characters, you MUST use `Symbol::new(&env, \"longer_string\")` instead.\n" +
+                "3. `soroban_sdk::ledger::now` does not exist! Get current time via `env.ledger().timestamp()` which returns a `u64`. Do NOT call `.get_bytes()` on it. If you need it as bytes, use `Bytes::from_array(&env, &timestamp.to_be_bytes())`.\n" +
+                "4. Always use `soroban_sdk::Address` for addresses, never `symbol::address` or `Address::from_str`.\n" +
+                "5. Panic using `panic!(\"msg\")`, do not use `panic_with_error` unless defined.\n" +
+                "6. NEVER use `env.storage().get()` or `env.storage().set()`. You MUST specify the storage type: `env.storage().instance().set(&key, &val)` or `env.storage().persistent().get(&key)`.\n" +
+                "7. For contractimpl traits, do NOT name your struct the same as a trait.\n" +
+                "8. NEVER use `env.invoker()`. To authorize, pass an `Address` as a parameter and call `address.require_auth()`.\n" +
+                "9. `Vec::len()` and `Vec::get(...)` in Soroban SDK return/accept `u32`, NOT `usize`. Cast appropriately (e.g. `index as u32` or `len() as usize`)."
             },
             {
               role: "user",
