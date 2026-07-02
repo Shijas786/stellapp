@@ -153,23 +153,6 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "bridge_evm_to_stellar",
-      description: "Bridge USDC from the user's EVM address (e.g. Base Sepolia) to their Stellar address via Circle CCTP.",
-      parameters: {
-        type: "object",
-        properties: {
-          amount: {
-            type: "string",
-            description: "The amount of USDC to bridge (e.g. '100')"
-          }
-        },
-        required: ["amount"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
       name: "deploy_escrow_contract",
       description: "Deploy a Soroban Escrow contract on Stellar for the user.",
       parameters: {
@@ -270,23 +253,6 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   },
 
 
-  {
-    type: "function",
-    function: {
-      name: "bridge_stellar_to_evm",
-      description: "Bridges USDC from the user's Stellar wallet to their EVM wallet using Circle's CCTP. Use this ONLY when the user explicitly wants to send USDC from Stellar to Base/EVM.",
-      parameters: {
-        type: "object",
-        properties: {
-          amount: {
-            type: "string",
-            description: "The amount of USDC to bridge (e.g. '100')"
-          }
-        },
-        required: ["amount"]
-      }
-    }
-  },
   {
     type: "function",
     function: {
