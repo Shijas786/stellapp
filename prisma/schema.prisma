@@ -63,3 +63,10 @@ model ConfidentialRegistry {
   auditorContract  String
   deployedAt       DateTime @default(now())
 }
+
+// Stores message histories for AI Agent conversations
+model ChatHistory {
+  chatId    String   @id
+  messages  String   // JSON-serialized array of OpenAI messages
+  updatedAt DateTime @default(now()) @updatedAt
+}

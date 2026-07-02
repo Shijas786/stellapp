@@ -15,23 +15,48 @@ if (!apiKey) {
 
 const openai = new OpenAI({ apiKey });
 
-// In-memory cache of user chat histories to preserve conversation context
-const chatHistories = new Map<string, OpenAI.Chat.ChatCompletionMessageParam[]>();
+// Helper to save history to DB with pruning
+async function saveHistory(chatId: string, history: OpenAI.Chat.ChatCompletionMessageParam[]): Promise<void> {
+  if (history.length > 25) {
+    const systemPrompt = history[0];
+    let sliceIndex = history.length - 20;
+    while (sliceIndex < history.length && history[sliceIndex].role !== "user") {
+      sliceIndex++;
+    }
+    if (sliceIndex === history.length) {
+      sliceIndex = history.length - 20;
+    }
+    history = [systemPrompt, ...history.slice(sliceIndex)];
+  }
+
+  try {
+    await prisma.chatHistory.upsert({
+      where: { chatId },
+      create: { chatId, messages: JSON.stringify(history) },
+      update: { messages: JSON.stringify(history) }
+    });
+  } catch (err: any) {
+    console.error(`[Agent] Failed to save chat history to database:`, err.message);
+  }
+}
 
 /**
  * Injects a silent context note into the AI's history for a given chatId.
  * Used by non-AI flows (e.g. vCard saves) so the AI remembers recent events
  * when the user's next message arrives.
  */
-export function injectContextMessage(chatId: string, assistantNote: string): void {
-  const history = chatHistories.get(chatId);
-  if (history) {
-    // Inject as an assistant message so the AI treats it as its own prior knowledge
-    history.push({ role: "assistant", content: assistantNote });
-    console.log(`[Agent] Injected context for ${chatId}: ${assistantNote.substring(0, 80)}`);
+export async function injectContextMessage(chatId: string, assistantNote: string): Promise<void> {
+  try {
+    const record = await prisma.chatHistory.findUnique({ where: { chatId } });
+    if (record) {
+      const history = JSON.parse(record.messages);
+      history.push({ role: "assistant", content: assistantNote });
+      await saveHistory(chatId, history);
+      console.log(`[Agent] Injected context for ${chatId}: ${assistantNote.substring(0, 80)}`);
+    }
+  } catch (err: any) {
+    console.error(`[Agent] Failed to inject context message:`, err.message);
   }
-  // If no history exists yet (user hasn't messaged before), nothing to inject — 
-  // the system prompt will carry the contacts list anyway.
 }
 
 type ActiveSkill = {
@@ -48,7 +73,7 @@ const activeSkillCache = new Map<string, ActiveSkill[]>();
 const activeLocks = new Set<string>();
 
 /**
- * Main AI agent runtime loop using OpenAI GPT-4o with tool calling capabilities.
+ * Main AI agent runtime loop using OpenAI models with tool calling capabilities.
  */
 export async function runAgentLoop(
   chatId: string,
@@ -61,169 +86,150 @@ export async function runAgentLoop(
   
   activeLocks.add(chatId);
   try {
-    let history = chatHistories.get(chatId);
-
-  // 1. Initialize or update history with formatted system prompt
-  const formattedSystemPrompt = SYSTEM_PROMPT
-    .replace("{{stellarPublic}}", user.stellarPublic);
-
-  if (!history) {
-    history = [
-      { role: "system", content: formattedSystemPrompt }
-    ];
-    chatHistories.set(chatId, history);
-  } else {
-    // Overwrite the first message (system prompt) to ensure freshness of contacts
-    history[0].content = formattedSystemPrompt;
-  }
-
-  // 2. Add new user query
-  history.push({ role: "user", content: userMessage });
-
-  // 3. Prepare dynamic system prompt with active skills
-  const baseSystemMessage = history[0];
-  let dynamicSystemContent = baseSystemMessage.content as string;
-
-  let activeSkills = activeSkillCache.get(chatId) || [];
-  const now = Date.now();
-  // Evict skills older than 60 minutes
-  activeSkills = activeSkills.filter(s => now - s.calledAt < 60 * 60 * 1000);
-  
-  if (activeSkills.length > 0) {
-    activeSkillCache.set(chatId, activeSkills);
-    const pinnedText = activeSkills.map(s => `[PINNED SKILL: ${s.skillName}]\n${s.content}`).join("\n\n---\n\n");
-    dynamicSystemContent += `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
-  } else {
-    activeSkillCache.delete(chatId);
-  }
-
-  const messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: dynamicSystemContent },
-    ...history.slice(1)
-  ];
-
-  // 4. Request completion from OpenAI
-  let response = await openai.chat.completions.create({
-    model: config.openaiModel,
-    messages: messagesForOpenAI,
-    tools: OPENAI_TOOLS
-  });
-
-  let assistantMessage = response.choices[0].message;
-  history.push(assistantMessage);
-
-  // Allow up to 5 sequential tool calling rounds (for multi-step agent actions)
-  for (let round = 0; round < 5; round++) {
-    if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
-      break; // No tools to call
-    }
-
-    console.log(`[Agent Loop] OpenAI requested ${assistantMessage.tool_calls.length} tool call(s)`);
-
-    // Execute tool calls in parallel (OpenAI native feature)
-    for (const toolCall of assistantMessage.tool_calls) {
-      const name = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments);
-
-      console.log(`[Agent Loop] Executing tool: ${name} with args:`, args);
-      
-      try {
-        if (name === "deploy_custom_contract") {
-          const contractType = (args.contractType || "custom").toLowerCase();
-          if (contractType === "custom") {
-            const currentSkills = activeSkillCache.get(chatId) || [];
-            if (!currentSkills.some(s => s.skillName === "smart-contracts" || s.skillName.startsWith("oz-"))) {
-              throw new Error("SECURITY BLOCK: You attempted to deploy a custom contract without reading the syntax rules. You MUST call read_skill with 'smart-contracts' or an 'oz-' skill first to load the correct Soroban syntax and OpenZeppelin patterns into your context window. Do not guess the Rust code.");
-            }
-          }
-        }
-
-        const toolResult = await executeTool(chatId, name, args, user);
-        
-        // Intercept read_skill to cache it permanently for this session
-        if (name === "read_skill" && typeof toolResult === "string" && !toolResult.startsWith("Error:") && !toolResult.includes("not found")) {
-          const skillName = args.skillName;
-          const currentSkills = activeSkillCache.get(chatId) || [];
-          const filteredSkills = currentSkills.filter(s => s.skillName !== skillName);
-          // Prepend new skill, cap array at 3 items
-          filteredSkills.unshift({ skillName, content: toolResult, calledAt: Date.now() });
-          activeSkillCache.set(chatId, filteredSkills.slice(0, 3));
-        }
-
-        history.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify({ result: toolResult })
-        });
-      } catch (error: any) {
-        console.error(`[Agent Loop] Tool execution failed for ${name}:`, error.message);
-        
-        // Feed the error output back to OpenAI
-        history.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify({ error: error.message || "Action failed." })
-        });
+    // 1. Load history from DB
+    let history: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    try {
+      const record = await prisma.chatHistory.findUnique({ where: { chatId } });
+      if (record) {
+        history = JSON.parse(record.messages);
       }
+    } catch (dbErr: any) {
+      console.error(`[Agent] Failed to load history from DB:`, dbErr.message);
     }
 
-    // Re-evaluate active skills (in case one was just added)
-    activeSkills = activeSkillCache.get(chatId) || [];
+    const formattedSystemPrompt = SYSTEM_PROMPT
+      .replace("{{stellarPublic}}", user.stellarPublic);
+
+    if (history.length === 0) {
+      history = [
+        { role: "system", content: formattedSystemPrompt }
+      ];
+    } else {
+      history[0].content = formattedSystemPrompt;
+    }
+
+    // 2. Add new user query
+    history.push({ role: "user", content: userMessage });
+    await saveHistory(chatId, history);
+
+    // 3. Prepare dynamic system prompt with active skills
+    const baseSystemMessage = history[0];
+    let dynamicSystemContent = baseSystemMessage.content as string;
+
+    let activeSkills = activeSkillCache.get(chatId) || [];
+    const now = Date.now();
+    activeSkills = activeSkills.filter(s => now - s.calledAt < 60 * 60 * 1000);
+    
     if (activeSkills.length > 0) {
+      activeSkillCache.set(chatId, activeSkills);
       const pinnedText = activeSkills.map(s => `[PINNED SKILL: ${s.skillName}]\n${s.content}`).join("\n\n---\n\n");
-      dynamicSystemContent = (baseSystemMessage.content as string) + `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
+      dynamicSystemContent += `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
+    } else {
+      activeSkillCache.delete(chatId);
     }
 
-    const updatedMessagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: dynamicSystemContent },
       ...history.slice(1)
     ];
 
-    // Call OpenAI again with the tool results added to the message log
-    response = await openai.chat.completions.create({
+    // 4. Request completion from OpenAI
+    let response = await openai.chat.completions.create({
       model: config.openaiModel,
-      messages: updatedMessagesForOpenAI,
+      messages: messagesForOpenAI,
       tools: OPENAI_TOOLS
     });
 
-    assistantMessage = response.choices[0].message;
+    let assistantMessage = response.choices[0].message;
     history.push(assistantMessage);
-  }
+    await saveHistory(chatId, history);
 
-  // If the loop exited but the last message is a tool call, we must remove it from history
-  // because we didn't execute the tools, rendering the history invalid for future turns.
-  if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-    history.pop();
-    assistantMessage = {
-      role: "assistant",
-      content: "⚠️ I reached my internal processing limit trying to fulfill your request. Please try again or break the task into smaller steps.",
-      refusal: null
-    };
-    history.push(assistantMessage);
-  }
+    // Allow up to 5 sequential tool calling rounds (for multi-step agent actions)
+    for (let round = 0; round < 5; round++) {
+      if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+        break;
+      }
 
-  // 4. Memory Optimization: keep history at a manageable size (last 20 messages)
-  if (history.length > 25) {
-    const systemPrompt = history[0];
-    let sliceIndex = history.length - 20;
-    
-    // Find the nearest user message to start the slice safely
-    // This prevents slicing an assistant tool_calls message while keeping its orphaned tool responses
-    while (sliceIndex < history.length && history[sliceIndex].role !== "user") {
-      sliceIndex++;
+      console.log(`[Agent Loop] OpenAI requested ${assistantMessage.tool_calls.length} tool call(s)`);
+
+      for (const toolCall of assistantMessage.tool_calls) {
+        const name = toolCall.function.name;
+        const args = JSON.parse(toolCall.function.arguments);
+
+        console.log(`[Agent Loop] Executing tool: ${name} with args:`, args);
+        
+        try {
+          if (name === "compile_custom_contract") {
+            const contractType = (args.contractType || "custom").toLowerCase();
+            if (contractType === "custom") {
+              const currentSkills = activeSkillCache.get(chatId) || [];
+              if (!currentSkills.some(s => s.skillName === "smart-contracts" || s.skillName.startsWith("oz-"))) {
+                throw new Error("SECURITY BLOCK: You attempted to compile a custom contract without reading the syntax rules. You MUST call read_skill with 'smart-contracts' or an 'oz-' skill first to load the correct Soroban syntax and OpenZeppelin patterns into your context window. Do not guess the Rust code.");
+              }
+            }
+          }
+
+          const toolResult = await executeTool(chatId, name, args, user);
+          
+          if (name === "read_skill" && typeof toolResult === "string" && !toolResult.startsWith("Error:") && !toolResult.includes("not found")) {
+            const skillName = args.skillName;
+            const currentSkills = activeSkillCache.get(chatId) || [];
+            const filteredSkills = currentSkills.filter(s => s.skillName !== skillName);
+            filteredSkills.unshift({ skillName, content: toolResult, calledAt: Date.now() });
+            activeSkillCache.set(chatId, filteredSkills.slice(0, 3));
+          }
+
+          history.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({ result: toolResult })
+          });
+        } catch (error: any) {
+          console.error(`[Agent Loop] Tool execution failed for ${name}:`, error.message);
+          history.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({ error: error.message || "Action failed." })
+          });
+        }
+      }
+
+      await saveHistory(chatId, history);
+
+      activeSkills = activeSkillCache.get(chatId) || [];
+      if (activeSkills.length > 0) {
+        const pinnedText = activeSkills.map(s => `[PINNED SKILL: ${s.skillName}]\n${s.content}`).join("\n\n---\n\n");
+        dynamicSystemContent = (baseSystemMessage.content as string) + `\n\n=== ACTIVE SKILLS CONTEXT ===\n${pinnedText}`;
+      }
+
+      const updatedMessagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: "system", content: dynamicSystemContent },
+        ...history.slice(1)
+      ];
+
+      response = await openai.chat.completions.create({
+        model: config.openaiModel,
+        messages: updatedMessagesForOpenAI,
+        tools: OPENAI_TOOLS
+      });
+
+      assistantMessage = response.choices[0].message;
+      history.push(assistantMessage);
+      await saveHistory(chatId, history);
     }
-    
-    // Fallback if we couldn't find a user message
-    if (sliceIndex === history.length) {
-      sliceIndex = history.length - 20;
+
+    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+      history.pop();
+      assistantMessage = {
+        role: "assistant",
+        content: "⚠️ I reached my internal processing limit trying to fulfill your request. Please try again or break the task into smaller steps.",
+        refusal: null
+      };
+      history.push(assistantMessage);
+      await saveHistory(chatId, history);
     }
 
-    const recentHistory = history.slice(sliceIndex);
-    chatHistories.set(chatId, [systemPrompt, ...recentHistory]);
-  }
-
-  // Return the final text message
-  return assistantMessage.content || "I have processed your request.";
+    return assistantMessage.content || "I have processed your request.";
   } finally {
     activeLocks.delete(chatId);
   }

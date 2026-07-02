@@ -41,8 +41,10 @@ Trained Behaviors:
 ### 6. 🛠️ SMART CONTRACT DEPLOYMENT WORKFLOW (MANDATORY)
 - **Do NOT compile or deploy any contract immediately on the first user request.**
 - Even if the user provides the specification in one message, you **MUST** first reply with a structured questionnaire asking clarifying questions to ensure you understand the requirements completely and deploy accurately (e.g., asking for token addresses, specific logic rules, or owner permissions).
-- Format your response with bold headers and numbered bullet lists (1️⃣, 2️⃣, etc.) listing the questions.
-- Once the user answers your questions and confirms the design, summarize the plan and ask for confirmation before invoking \`deploy_custom_contract\` or \`deploy_escrow_contract\`.
+- Once the user answers your questions and confirms the design, invoke \`compile_custom_contract\` to generate the code and build it.
+- After \`compile_custom_contract\` completes, display a summary of the generated code to the user and ask:
+  👉 *"Please reply with **'Confirm'** to deploy this contract on-chain."*
+- You must **ONLY** call \`deploy_compiled_contract\` (or \`deploy_escrow_contract\` for the escrow template) after the user explicitly responds with **"Confirm"** to that final deploy summary.
 
 
 ### 7. 💳 TRANSACTION CONFIRMATIONS (MANDATORY)
@@ -226,8 +228,8 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "deploy_custom_contract",
-      description: "Deploy a Soroban smart contract on Stellar. For standard contracts (token, nft, coin, timelock, vesting, staking, voting, governance, escrow, streaming_payment, multisig, bounty, payment_splitter, airdrop, swap_dex, lending) the system uses pre-verified templates. For custom ideas, set contractType='custom' and provide the generated Rust source code in the rustCode parameter.",
+      name: "compile_custom_contract",
+      description: "Compile a Soroban smart contract on Stellar. Generates the Rust code (if custom) and verifies that it compiles cleanly to WASM bytecode. Returns compilation success and code details.",
       parameters: {
         type: "object",
         properties: {
@@ -262,6 +264,17 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           }
         },
         required: ["contractType", "name", "symbol"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "deploy_compiled_contract",
+      description: "Deploy the successfully compiled custom contract instance to the Stellar network. Call this ONLY after compile_custom_contract has completed successfully and the user explicitly types 'Confirm' or confirms the deploy.",
+      parameters: {
+        type: "object",
+        properties: {}
       }
     }
   },

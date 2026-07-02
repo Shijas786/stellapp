@@ -850,13 +850,10 @@ export async function executeTool(
       };
     }
 
-    case "deploy_custom_contract": {
-      await sendNotification(chatId, "⏳ *Compiling & Deploying Custom Contract...*\n\nThis involves writing the Rust smart contract, compiling it to WASM, and deploying it to the Stellar network. It usually takes 45-60 seconds. Please wait!");
-      const stellarSecret = decrypt(user.stellarSecret);
+    case "compile_custom_contract": {
+      await sendNotification(chatId, "⏳ *Generating & Compiling Custom Contract...*\n\nThis involves generating the Rust code and verifying that it compiles cleanly. Please wait!");
       const contractType: string = (args.contractType || "custom").toLowerCase();
 
-      // ⭐ Use hardcoded proven templates instead of AI-generated Rust
-      // This prevents hallucination errors entirely.
       let rustCode: string;
       if (contractType === "token" || contractType === "coin") {
         const name = args.name || "MyToken";
@@ -903,11 +900,10 @@ export async function executeTool(
       } else if (contractType === "lending") {
         rustCode = templates.LENDING_TEMPLATE;
       } else {
-        // For truly custom contracts, use gpt-4o as a specialized coder agent
         const customDescription = args.customDescription || "";
         if (!customDescription) throw new Error("customDescription is required for custom contracts.");
         
-        console.log(`[Tools] Generating custom Rust contract using gpt-4o for description: ${customDescription}`);
+        console.log(`[Tools] Generating custom Rust contract using specialized coder for description: ${customDescription}`);
         
         const openai = new OpenAI();
         const codeGenResponse = await openai.chat.completions.create({
@@ -935,36 +931,120 @@ export async function executeTool(
 
         rustCode = codeGenResponse.choices[0].message.content || "";
         
-        // Cleanup any markdown blocks if the AI accidentally included them
-        if (rustCode.startsWith("\`\`\`rust")) rustCode = rustCode.replace("\`\`\`rust", "");
-        if (rustCode.startsWith("\`\`\`")) rustCode = rustCode.replace("\`\`\`", "");
-        if (rustCode.endsWith("\`\`\`")) rustCode = rustCode.slice(0, -3);
+        if (rustCode.startsWith("```rust")) rustCode = rustCode.replace("```rust", "");
+        if (rustCode.startsWith("```")) rustCode = rustCode.replace("```", "");
+        if (rustCode.endsWith("```")) rustCode = rustCode.slice(0, -3);
         rustCode = rustCode.trim();
 
-        // Safety net: if AI forgot the #![no_std] directive, inject it
         if (!rustCode.includes("#![no_std]")) {
           rustCode = "#![no_std]\n" + rustCode;
         }
         
-        // Safety net: if AI forgot the imports completely, inject standard ones
         if (!rustCode.includes("use soroban_sdk")) {
           rustCode = rustCode.replace("#![no_std]", "#![no_std]\nuse soroban_sdk::{contract, contractimpl, contracttype, contracterror, Address, Env, Vec, String, Map, Symbol, symbol_short, token};\n");
         }
       }
 
-      // 1. Compile chosen template to WASM
-      console.log(`[Tools] Starting custom contract compilation (type=${contractType})...`);
-      const wasmBytes = compileRustContract(rustCode);
+      // Compile with self-healing compile-error loop (up to 3 turns)
+      let wasmBytes: Buffer | null = null;
+      let compilationError = "";
+      
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[Tools] Compilation attempt ${attempt}/3...`);
+          wasmBytes = compileRustContract(rustCode);
+          break;
+        } catch (err: any) {
+          compilationError = err.message;
+          console.error(`[Tools] Attempt ${attempt} compilation failed:`, compilationError);
+          
+          if (attempt === 3) break;
+          
+          console.log(`[Tools] Healing compilation errors (attempt ${attempt + 1})...`);
+          const openai = new OpenAI();
+          const fixResponse = await openai.chat.completions.create({
+            model: config.openaiModel,
+            messages: [
+              {
+                role: "system",
+                content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). You will be given a Soroban contract that failed to compile, along with the Cargo compiler error message. Fix the errors and return ONLY the corrected, clean, raw Rust code. No markdown code blocks, no backticks, no markdown formatting, no explanations. It must start with #![no_std]."
+              },
+              {
+                role: "user",
+                content: `Failed Rust Code:\n\`\`\`rust\n${rustCode}\n\`\`\`\n\nCargo Compiler Error:\n${compilationError}\n\nFix the compilation errors and output the complete corrected Rust code.`
+              }
+            ]
+          });
+          
+          let fixedCode = fixResponse.choices[0].message.content || "";
+          if (fixedCode.startsWith("```rust")) fixedCode = fixedCode.replace("```rust", "");
+          if (fixedCode.startsWith("```")) fixedCode = fixedCode.replace("```", "");
+          if (fixedCode.endsWith("```")) fixedCode = fixedCode.slice(0, -3);
+          fixedCode = fixedCode.trim();
+          
+          if (!fixedCode.includes("#![no_std]")) {
+            fixedCode = "#![no_std]\n" + fixedCode;
+          }
+          rustCode = fixedCode;
+        }
+      }
 
-      // 2. Upload WASM bytes on-chain
+      if (!wasmBytes) {
+        throw new Error(`Smart contract compilation failed after 3 attempts. Errors:\n${compilationError}`);
+      }
+
+      // Save compiled WASM & details to SessionState database
+      const dbStateRecord = await prisma.sessionState.findUnique({ where: { chatId } });
+      const dbState = dbStateRecord ? JSON.parse(dbStateRecord.stateJson) : {};
+      
+      dbState.lastWasmBytesHex = wasmBytes.toString("hex");
+      dbState.lastName = args.name || "CustomContract";
+      dbState.lastSymbol = args.symbol || "CUST";
+      dbState.lastRustCode = rustCode;
+      
+      await prisma.sessionState.upsert({
+        where: { chatId },
+        create: { chatId, stateJson: JSON.stringify(dbState) },
+        update: { stateJson: JSON.stringify(dbState) }
+      });
+
+      console.log(`[Tools] Saved compiled contract metadata successfully for ${chatId}.`);
+
+      return {
+        success: true,
+        message: "Smart contract generated and compiled successfully!",
+        name: dbState.lastName,
+        symbol: dbState.lastSymbol,
+        rustCode: rustCode
+      };
+    }
+
+    case "deploy_compiled_contract": {
+      await sendNotification(chatId, "⏳ *Uploading & Instantiating Compiled Contract...*\n\nThis uploads the pre-compiled WASM bytecodes to the Stellar network ledger and creates the contract instance. Please wait...");
+      const stellarSecret = decrypt(user.stellarSecret);
+
+      const dbStateRecord = await prisma.sessionState.findUnique({ where: { chatId } });
+      const dbState = dbStateRecord ? JSON.parse(dbStateRecord.stateJson) : {};
+      
+      if (!dbState.lastWasmBytesHex) {
+        throw new Error("No compiled contract was found. Please call compile_custom_contract first.");
+      }
+
+      const wasmBytes = Buffer.from(dbState.lastWasmBytesHex, "hex");
+
       console.log(`[Tools] Uploading WASM bytecode on-chain...`);
       const { wasmHash, txHash: uploadTxHash } = await stellar.uploadWasm(stellarSecret, wasmBytes);
       console.log(`[Tools] Contract WASM uploaded. Hash: ${wasmHash}`);
 
-      // 3. Instantiate the contract instance on-chain
       console.log(`[Tools] Instantiating contract instance from WASM hash...`);
       const { contractId, txHash: instantiateTxHash } = await stellar.instantiateContract(stellarSecret, wasmHash);
       console.log(`[Tools] Deployed custom contract ID: ${contractId}`);
+
+      delete dbState.lastWasmBytesHex;
+      await prisma.sessionState.update({
+        where: { chatId },
+        data: { stateJson: JSON.stringify(dbState) }
+      });
 
       return {
         success: true,

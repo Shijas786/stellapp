@@ -197,7 +197,7 @@ export class WhatsAppBot {
                 
                 // Inject context into the AI history so the next message
                 // (e.g. "send him 10 USDC") knows who was just saved.
-                injectContextMessage(
+                await injectContextMessage(
                   msg.author || msg.from,
                   `I just saved a new contact: *${name}* with phone number +${phoneNumber}. If the user refers to "him", "her", or "them" in their next message, they almost certainly mean ${name} (+${phoneNumber}).`
                 );
