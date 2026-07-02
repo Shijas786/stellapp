@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellapp | AI Crypto Assistant on WhatsApp</title>
+    <meta name="description" content="Manage your Stellar and EVM crypto directly from WhatsApp. Send, swap, bridge, and deploy smart contracts simply by chatting.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+    <div class="mesh-bg"></div>
+    <nav class="navbar glass">
+        <a href="/" class="logo" style="text-decoration: none;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#paint0_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 17L12 22L22 17" stroke="url(#paint1_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 12L12 17L22 12" stroke="url(#paint2_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <defs>
+                    <linearGradient id="paint0_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#81C784"/>
+                        <stop offset="1" stop-color="#173F35"/>
+                    </linearGradient>
+                    <linearGradient id="paint1_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#81C784"/>
+                        <stop offset="1" stop-color="#2E7D32"/>
+                    </linearGradient>
+                    <linearGradient id="paint2_linear" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#81C784"/>
+                        <stop offset="1" stop-color="#173F35"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+            <span>Stellapp</span>
+        </a>
+        <div class="nav-links" style="display: flex; gap: 20px; align-items: center;">
+            <a href="/#products" class="nav-text-link">Products</a>
+            <a href="/roadmap.html" class="nav-text-link">Roadmap</a>
+            <div class="magnetic-wrap">
+                <a href="http://localhost:3000" target="_blank" class="nav-btn glass-btn" style="background: rgba(129, 199, 132, 0.1); border-color: rgba(129, 199, 132, 0.3); color: #81C784;">Login to Dashboard</a>
+            </div>
+            <div class="magnetic-wrap">
+                <a href="/#connect" class="nav-btn glass-btn">Connect WhatsApp</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Roadmap Section -->
+    <section id="roadmap" class="roadmap-section" style="margin-top: 100px;">
+        <div class="bento-header">
+            <h2>Product <span class="highlight">Roadmap</span></h2>
+        </div>
+        <div class="roadmap-container">
+            <div class="roadmap-item">
+                <div class="roadmap-marker"></div>
+                <div class="roadmap-content glass">
+                    <span class="roadmap-date">Priority 1</span>
+                    <h3>Official Meta API Integration</h3>
+                    <p>Upgrade to the official WhatsApp Cloud API for enhanced reliability, richer message formats, and extra interactive features directly in chat.</p>
+                </div>
+            </div>
+            <div class="roadmap-item">
+                <div class="roadmap-marker"></div>
+                <div class="roadmap-content glass">
+                    <span class="roadmap-date">Priority 2</span>
+                    <h3>Telegram Mini App</h3>
+                    <p>Native Telegram integration using identical phone-verified userdata. Access your wallet effortlessly without leaving your favorite Telegram chats.</p>
+                </div>
+            </div>
+            <div class="roadmap-item">
+                <div class="roadmap-marker"></div>
+                <div class="roadmap-content glass">
+                    <span class="roadmap-date">Priority 3</span>
+                    <h3>Cross-Chain Bridging</h3>
+                    <p>Bridge and swap assets natively across different blockchain networks via intent-based messaging without manual bridging interfaces.</p>
+                </div>
+            </div>
+            <div class="roadmap-item">
+                <div class="roadmap-marker"></div>
+                <div class="roadmap-content glass">
+                    <span class="roadmap-date">Priority 4</span>
+                    <h3>EVM Supported Chains</h3>
+                    <p>Expand compatibility to Ethereum, Polygon, Arbitrum, and other EVM-compatible networks for a broader DeFi ecosystem.</p>
+                </div>
+            </div>
+            <div class="roadmap-item">
+                <div class="roadmap-marker"></div>
+                <div class="roadmap-content glass">
+                    <span class="roadmap-date">Priority 5</span>
+                    <h3>Stellar On & Off-Ramps</h3>
+                    <p>Frictionless fiat-to-crypto conversions globally. Buy and cash out crypto directly to your bank account using Stellar's anchor network.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+
+    <footer class="glass">
+        <p>&copy; 2026 Stellapp. Built on Stellar. Hosted on Railway.</p>
+    </footer>
+
+    <script>
+        // Simple typing animation logic for the mockup
+        setTimeout(() => {
+            const typing = document.querySelector('.typing');
+            typing.innerHTML = "✅ Transaction successful! Sent 10 USDC to shijas*stellapp.com.<br><br>Tx Hash: <code>a7f8...9b2c</code>";
+            typing.classList.remove('typing');
+        }, 3000);
+
+        // FAQ Accordion Logic
+        document.querySelectorAll('.faq-question').forEach(button => {
+            button.addEventListener('click', () => {
+                const faqItem = button.parentElement;
+                const isActive = faqItem.classList.contains('active');
+                
+                // Close all other items
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Toggle current item
+                if (!isActive) {
+                    faqItem.classList.add('active');
+                }
+            });
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="/assets/animations.js"></script>
+</body>
+</html>

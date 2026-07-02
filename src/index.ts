@@ -143,8 +143,9 @@ http.createServer(async (_req, res) => {
   }
 
   // 3. Serve Public Landing Page
-  if (parsedUrl.pathname === "/" && !query.token) {
-    const indexPath = path.join(process.cwd(), "public", "index.html");
+  if ((parsedUrl.pathname === "/" || parsedUrl.pathname === "/roadmap.html") && !query.token) {
+    const fileName = parsedUrl.pathname === "/" ? "index.html" : "roadmap.html";
+    const indexPath = path.join(process.cwd(), "public", fileName);
     if (fs.existsSync(indexPath)) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(fs.readFileSync(indexPath));
