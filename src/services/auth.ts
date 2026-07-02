@@ -1,11 +1,22 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "stellapp-super-secret-jwt-key";
+// SECURITY: Refuse to start if JWT_SECRET is not explicitly set in environment.
+// A missing secret must never silently fall back to a known/predictable string.
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error(
+    "FATAL: JWT_SECRET environment variable is not set. " +
+    "Set a strong random secret in your .env file before starting the server."
+  );
+}
+
 const OTP_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_OTP_ATTEMPTS = 5;
 
 interface PendingOTP {
   code: string;
   expiresAt: number;
+  attempts: number; // Brute-force protection: lockout after MAX_OTP_ATTEMPTS
 }
 
 // In-memory store for OTPs. In a production app, use Redis or a Database.
@@ -20,7 +31,8 @@ export function generateOTP(phoneNumber: string): string {
   
   otpStore.set(phoneNumber, {
     code,
-    expiresAt: Date.now() + OTP_EXPIRATION_MS
+    expiresAt: Date.now() + OTP_EXPIRATION_MS,
+    attempts: 0
   });
 
   return code;
@@ -36,16 +48,25 @@ export function validateOTP(phoneNumber: string, code: string): boolean {
     return false;
   }
   
+  // Check expiry
   if (Date.now() > pending.expiresAt) {
     otpStore.delete(phoneNumber);
     return false;
   }
-  
+
+  // Brute-force lockout: invalidate after too many wrong attempts
+  if (pending.attempts >= MAX_OTP_ATTEMPTS) {
+    otpStore.delete(phoneNumber);
+    return false;
+  }
+
   if (pending.code === code) {
     otpStore.delete(phoneNumber);
     return true;
   }
-  
+
+  // Wrong guess — increment attempt counter
+  pending.attempts++;
   return false;
 }
 
@@ -53,7 +74,7 @@ export function validateOTP(phoneNumber: string, code: string): boolean {
  * Issues a JWT token for the authenticated phone number.
  */
 export function issueToken(phoneNumber: string): string {
-  return jwt.sign({ phoneNumber }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ phoneNumber }, JWT_SECRET!, { expiresIn: "7d" });
 }
 
 /**
@@ -61,7 +82,7 @@ export function issueToken(phoneNumber: string): string {
  */
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET!);
   } catch (err) {
     return null;
   }

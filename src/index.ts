@@ -75,9 +75,13 @@ http.createServer(async (_req, res) => {
   }
 
   // 2.5 Auth API Endpoints (Dashboard Login)
+  // Restrict CORS to known dashboard origin only (P3 fix)
+  const ALLOWED_ORIGIN = process.env.DASHBOARD_URL || "http://localhost:3000";
+
   if (_req.method === "POST" && parsedUrl.pathname === "/api/auth/request-otp") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Vary", "Origin");
     let body = "";
     _req.on("data", chunk => body += chunk.toString());
     _req.on("end", async () => {
@@ -101,8 +105,9 @@ http.createServer(async (_req, res) => {
   }
 
   if (_req.method === "POST" && parsedUrl.pathname === "/api/auth/verify-otp") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Vary", "Origin");
     let body = "";
     _req.on("data", chunk => body += chunk.toString());
     _req.on("end", async () => {
@@ -128,8 +133,10 @@ http.createServer(async (_req, res) => {
 
   // Handle CORS Preflight for the API
   if (_req.method === "OPTIONS" && parsedUrl.pathname?.startsWith("/api/auth")) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Vary", "Origin");
     res.writeHead(204);
     res.end();
     return;
