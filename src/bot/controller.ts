@@ -61,7 +61,8 @@ export async function handleIncomingMessage(
     const cleanText = text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "");
     if (cleanText !== "create wallet") {
       return `👋 *Welcome to Stellapp!* 🚀\n\n` +
-        `Your personal crypto companion, right inside WhatsApp. You can check balances, send payments, swap tokens on the Stellar DEX, perform private zero-knowledge transactions, and deploy smart contracts just by texting or sending a voice note. 🎙️\n\n` +
+        `Your personal zero-knowledge crypto companion, right inside WhatsApp. \n\n` +
+        `Manage assets, swap tokens on the Stellar DEX, perform private ZK transfers, and deploy smart contracts—all with zero gas fees. 🎙️\n\n` +
         `To get started and generate your secure Stellar wallet, please reply:\n` +
         `👉 *"create wallet"*`;
     }
@@ -145,14 +146,15 @@ export async function handleIncomingMessage(
       ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*stellapp.com\`)\n\n`
       : "";
 
-    return `👋 *Stellapp Wallet Created!* 🚀\n\n` +
-      `Your personal Stellar wallet has been securely initialized:\n\n` +
-      `✨ *Stellar Address:* \n\`${user.stellarPublic}\`\n\n` +
+    return `✨ *Wallet Created Successfully!* 💳\n\n` +
+      `Your personal Stellar wallet is active:\n` +
+      `\`${user.stellarPublic}\`\n\n` +
       usernameStatus +
       `${fundingStatus}\n\n` +
-      `🔒 *ZK Confidential Transfers Enabled:*\n` +
-      `You can now perform fully private zero-knowledge transactions for both XLM and USDC.\n\n` +
-      `💡 *Try sending:* "What's my balance?", "Send 10 USDC to Bob", "Register me for USDC confidential", or "Deploy an escrow contract"`;
+      `🛡️ *ZK Privacy Enabled*\n` +
+      `Send assets confidentially on-chain using zero-knowledge proofs.\n\n` +
+      `To get started, try replying:\n` +
+      `👉 *"Check my balance"* or *"Send 10 USDC"*`;
   }
 
   if (!user) {
