@@ -40,7 +40,6 @@ RUN cargo install soroban-cli --locked
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_SKIP_VALIDATION=true
-ENV NODE_ENV=production
 ENV PATH="/usr/local/cargo/bin:${PATH}"
 
 WORKDIR /app
@@ -50,8 +49,10 @@ RUN mkdir -p .wwebjs_auth /tmp/chromium-cache && \
     chmod -R 777 .wwebjs_auth /tmp/chromium-cache
 
 # ============================================
-# Install Node Dependencies
+# Build Application
 # ============================================
+# Remove NODE_ENV=production during build so devDependencies are installed
+ENV NODE_ENV=development
 COPY package*.json ./
 RUN npm ci
 
@@ -60,10 +61,11 @@ RUN npx prisma generate
 
 COPY . .
 
-# ============================================
-# Build Application
-# ============================================
-RUN npm run build 2>&1 || true
+# Run build WITHOUT ignoring errors
+RUN npm run build
+
+# Set production environment for runtime
+ENV NODE_ENV=production
 
 EXPOSE 8080
 
