@@ -120,14 +120,14 @@ When a user expresses a desire to deploy the template escrow contract, **do not 
 - Keep responses readable, concise, and structured. Use bold headers and emojis for conversational warmth.
 - **IMPORTANT**: When presenting options to the user (e.g. asking them what they want to do next, or giving them choices), ALWAYS use a numbered list format (e.g., *1️⃣ Option One*, *2️⃣ Option Two*) and ask them to reply with the number. Do not use bullet points for menus.
 
-### 8. 🔒 OPTIONAL USDC PRIVACY POOLS & SHIELDED PAYMENTS
-- If the user wants to make a private transaction (e.g. "deposit USDC privately" or "send USDC privately"), guide them to use the Privacy Pool.
+### 8. 🔒 OPTIONAL ZK PRIVACY POOLS & SHIELDED PAYMENTS (USDC / XLM)
+- If the user wants to make a private transaction (e.g. "deposit USDC/XLM privately" or "send XLM privately"), guide them to use the ZK Privacy Pool.
 - Explain the flow:
-  1. They must specify the USDC amount.
-  2. If a Privacy Pool contract is not yet deployed, call \`deploy_privacy_pool\` first. Or use the current pool if they provide one.
-  3. Invoke \`deposit_private_pool\`. This generates the secret keys, computes the commitment, locks the USDC, and outputs a single *Secret Note* string (\`stellapp-note-v1_...\`).
+  1. They must specify the asset (USDC or XLM) and the amount.
+  2. If a Privacy Pool contract is not yet deployed for that asset, call \`deploy_privacy_pool\` with the corresponding \`assetCode\` first.
+  3. Invoke \`deposit_private_pool\` with the \`contractId\` and \`assetCode\`. This generates the secret keys, computes the commitment, locks the tokens, and outputs a single *Secret Note* string (\`stellapp-zk-v1_...\`).
   4. Instruct the user to save this note securely and provide it to the receiver.
-  5. The receiver can text the bot: *"withdraw stellapp-note-v1_..."*. The bot will parse the note and call \`withdraw_private_pool\` to transfer the USDC privately to their public address, shielded on-chain.
+  5. The receiver can text the bot: *"withdraw stellapp-zk-v1_..."*. The bot will parse the note and call \`withdraw_private_pool\` to transfer the tokens privately to their public address, shielded on-chain.
 
 ### 9. ⚠️ XLM RESERVE AWARENESS
 - Stellar requires a **minimum balance reserve**: 1 XLM base + 0.5 XLM per trustline or sub-entry.
@@ -388,14 +388,23 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deploy_privacy_pool",
-      description: "Deploy a new instance of the ZK-Shielded USDC Privacy Pool contract on-chain."
+      description: "Deploy a new instance of the ZK-Shielded Privacy Pool contract on-chain for a specific asset.",
+      parameters: {
+        type: "object",
+        properties: {
+          assetCode: {
+            type: "string",
+            description: "The asset code to pool (e.g. 'USDC' or 'XLM'). Defaults to 'USDC'."
+          }
+        }
+      }
     }
   },
   {
     type: "function",
     function: {
       name: "deposit_private_pool",
-      description: "Deposit USDC into the Privacy Pool privately by submitting a generated commitment hash.",
+      description: "Deposit tokens into the Privacy Pool privately by submitting a generated commitment hash.",
       parameters: {
         type: "object",
         properties: {
@@ -405,7 +414,11 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           },
           amount: {
             type: "string",
-            description: "The amount of USDC to shield/deposit (e.g. '10.0')"
+            description: "The amount of tokens to shield/deposit (e.g. '10.0')"
+          },
+          assetCode: {
+            type: "string",
+            description: "The asset code of the tokens being deposited (e.g. 'USDC' or 'XLM'). Defaults to 'USDC'."
           }
         },
         required: ["contractId", "amount"]
@@ -416,13 +429,13 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "withdraw_private_pool",
-      description: "Withdraw USDC from the Privacy Pool by providing the client secret note.",
+      description: "Withdraw tokens from the Privacy Pool by providing the client secret note.",
       parameters: {
         type: "object",
         properties: {
           secretNote: {
             type: "string",
-            description: "The full secret note string parsed from the deposit (starts with 'stellapp-note-v1_...')"
+            description: "The full secret note string parsed from the deposit (starts with 'stellapp-zk-v1_...')"
           }
         },
         required: ["secretNote"]

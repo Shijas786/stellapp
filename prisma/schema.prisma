@@ -41,7 +41,8 @@ model PrivacyDeposit {
   contractId    String   // Stellar privacy pool contract ID
   commitmentHex String   // The on-chain commitment hash (hex)
   leafIndex     Int      @default(0) // Position in the Merkle tree (0-based)
-  amount        String   // Amount of USDC deposited
+  amount        String   // Amount of USDC/XLM deposited
+  assetCode     String   @default("USDC") // The token symbol, e.g. "USDC" or "XLM"
   nullifierHash String?  // Set after withdrawal to prevent double-spend tracking
   spent         Boolean  @default(false)
   createdAt     DateTime @default(now())

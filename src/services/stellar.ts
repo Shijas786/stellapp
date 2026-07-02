@@ -639,7 +639,8 @@ export async function instantiateContract(
  * Deploys the Privacy Pool contract and initializes it with dynamic USDC asset contract ID.
  */
 export async function deployPrivacyPool(
-  secretKey: string
+  secretKey: string,
+  assetCode: string = "USDC"
 ): Promise<{ contractId: string; txHash: string }> {
   const wasmPath = path.join(
     process.cwd(),
@@ -659,16 +660,17 @@ export async function deployPrivacyPool(
   const { contractId } = await instantiateContract(secretKey, wasmHash);
   console.log(`[Stellar] Contract instantiated. ID: ${contractId}`);
 
-  const usdcContractId = USDC_ASSET.contractId(PASSPHRASE);
+  const tokenAsset = assetCode.toUpperCase() === "XLM" ? Asset.native() : USDC_ASSET;
+  const tokenContractId = tokenAsset.contractId(PASSPHRASE);
   const publicKey = Keypair.fromSecret(secretKey).publicKey();
-  console.log(`[Stellar] Initializing Privacy Pool with USDC Contract ID: ${usdcContractId}`);
+  console.log(`[Stellar] Initializing Privacy Pool with Token (${assetCode}) Contract ID: ${tokenContractId}`);
 
   const initTx = await invokeContractMethod(
     secretKey,
     contractId,
     "initialize",
     [
-      xdr.ScVal.scvAddress(Address.fromString(usdcContractId).toScAddress())
+      xdr.ScVal.scvAddress(Address.fromString(tokenContractId).toScAddress())
     ]
   );
 

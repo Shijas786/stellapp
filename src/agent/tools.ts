@@ -947,14 +947,16 @@ export async function executeTool(
     }
 
     case "deploy_privacy_pool": {
-      await sendNotification(chatId, "⏳ *Deploying ZK Privacy Pool...*\n\nThis involves deploying the Zero-Knowledge verifier and the privacy pool to the Stellar network. It usually takes 30-45 seconds. Please wait!");
+      const assetCode = (args.assetCode || "USDC").toUpperCase();
+      await sendNotification(chatId, `⏳ *Deploying ZK Privacy Pool for ${assetCode}...*\n\nThis involves deploying the Zero-Knowledge verifier and the privacy pool to the Stellar network. It usually takes 30-45 seconds. Please wait!`);
       const stellarSecret = decrypt(user.stellarSecret);
-      const { contractId, txHash } = await stellar.deployPrivacyPool(stellarSecret);
+      const { contractId, txHash } = await stellar.deployPrivacyPool(stellarSecret, assetCode);
 
       return {
         success: true,
         contractId,
         txHash,
+        assetCode,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
         contractExplorerUrl: `${config.explorerUrlStellarContract}${contractId}`
       };
@@ -962,6 +964,7 @@ export async function executeTool(
 
     case "deposit_private_pool": {
       const stellarSecret = decrypt(user.stellarSecret);
+      const assetCode = (args.assetCode || "USDC").toUpperCase();
       
       const { secret, nullifier, commitment } = await zkPool.generateDeposit();
       const amountStr = args.amount;
@@ -993,6 +996,7 @@ export async function executeTool(
           commitmentHex,
           leafIndex,
           amount: amountStr,
+          assetCode,
           spent: false
         }
       });
@@ -1006,7 +1010,7 @@ export async function executeTool(
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
         secretNote,
-        message: `Successfully deposited ${amountStr} USDC into the Privacy Pool! 🤫\n\nSave this secret note to withdraw your funds later or send it to someone else:\n\n\`${secretNote}\``
+        message: `Successfully deposited ${amountStr} ${assetCode} into the Privacy Pool! 🤫\n\nSave this secret note to withdraw your funds later or send it to someone else:\n\n\`${secretNote}\``
       };
     }
 
@@ -1089,8 +1093,10 @@ export async function executeTool(
         success: true,
         contractId,
         amount: amountStr,
+        assetCode: depositRecord.assetCode,
         txHash,
-        explorerUrl: `${config.explorerUrlStellar}${txHash}`
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: `Successfully withdrew ${amountStr} ${depositRecord.assetCode} from the Privacy Pool! 🎉`
       };
     }
 
