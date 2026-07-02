@@ -61,10 +61,13 @@ RUN npx prisma generate
 
 COPY . .
 
+# Set NODE_ENV to production BEFORE building Next.js to prevent mixed React environments
+ENV NODE_ENV=production
+
 # Run build WITHOUT ignoring errors
 RUN npm run build
 
-# Set production environment for runtime
+# Ensure production environment for runtime
 ENV NODE_ENV=production
 
 EXPOSE 8080
