@@ -34,6 +34,22 @@ const DEPLOYED_AT_LEDGER = 5123000; // Safe starting ledger for testnet events
 const stateStorePath = path.join(process.cwd(), "scratch", "confidential_state.json");
 const stateStore = new JsonFileStore(stateStorePath);
 
+// Detect whether 'stellar' or 'soroban' CLI is available on PATH
+function getBlockchainCli(): string {
+  const { execSync } = require("child_process");
+  try {
+    execSync("which stellar", { stdio: "ignore" });
+    return "stellar";
+  } catch {
+    try {
+      execSync("which soroban", { stdio: "ignore" });
+      return "soroban";
+    } catch {
+      throw new Error("Stellar/Soroban CLI is not installed on PATH.");
+    }
+  }
+}
+
 // Initialize Circuit Provers lazily to save startup memory/time
 let registerProver: CircuitProver | null = null;
 let withdrawProver: CircuitProver | null = null;
@@ -103,8 +119,9 @@ export async function getOrDeployConfidentialToken(
   const verifier = CONFIDENTIAL_CONTRACTS.verifier;
   const auditor = CONFIDENTIAL_CONTRACTS.auditor;
   const wasmPath = path.join(process.cwd(), "contracts_wasm", "confidential_token.wasm");
+  const cliName = getBlockchainCli();
 
-  const cmd = `stellar contract deploy \
+  const cmd = `${cliName} contract deploy \
     --wasm "${wasmPath}" \
     --source-account "${secretKey}" \
     --network testnet \
