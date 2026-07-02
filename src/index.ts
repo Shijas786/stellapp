@@ -164,18 +164,17 @@ http.createServer(async (_req, res) => {
         if (realAccount) {
           logs.push(`Found duplicate! Orphan: ${orphan.chatId}, Real: ${realAccount.chatId}`);
           
-          await prisma.user.update({
-            where: { id: realAccount.id },
-            data: {
-              stellarPublic: orphan.stellarPublic,
-              stellarSecret: orphan.stellarSecret,
-              evmAddress: orphan.evmAddress,
-              evmPrivateKey: orphan.evmPrivateKey
-            }
+          // Delete the empty duplicate account first
+          await prisma.user.delete({
+            where: { id: realAccount.id }
           });
           
-          await prisma.user.delete({
-            where: { id: orphan.id }
+          // Rename the orphan to the correct long chatId
+          await prisma.user.update({
+            where: { id: orphan.id },
+            data: {
+              chatId: realAccount.chatId
+            }
           });
           
           fixed++;
