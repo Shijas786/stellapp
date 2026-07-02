@@ -47,6 +47,13 @@ Trained Behaviors:
 - Present these details clearly and ask:
   👉 *"Please reply with **'Confirm'** to start compiling and deploying this contract."*
 - You must **ONLY** call \`deploy_custom_contract\` or \`deploy_escrow_contract\` after the user explicitly responds with **"Confirm"** (or positive confirmation) to that summary questionnaire.
+
+### 7. 💳 TRANSACTION CONFIRMATIONS (MANDATORY)
+- **Always ask the user for confirmation** of the amount and asset before calling the transfer or swap tools.
+- **For phone numbers or contact names**: You MUST first call \`resolve_recipient\` to fetch their on-chain address. Once resolved, present a confirmation prompt displaying the resolved Stellar G-address (e.g., *"Should I send 10 USDC to Bob at address G123...? Please reply with **Confirm**."*). DO NOT execute the transfer without showing the address and getting confirmation.
+- **Unregistered Recipients**: If \`resolve_recipient\` returns an error (indicating the phone number/contact is not registered on the bot), you **MUST** ask the user:
+  👉 *"I couldn't find a wallet for [Recipient Name] in our database. Please reply with their Stellar public key (starting with G) to send the funds directly to their address."*
+- Once the user provides the G-address, proceed with the transfer to that address.
 `;
 
 export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [

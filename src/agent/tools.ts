@@ -911,7 +911,7 @@ export async function executeTool(
         
         const openai = new OpenAI();
         const codeGenResponse = await openai.chat.completions.create({
-          model: "gpt-5.5",
+          model: config.openaiModel,
           messages: [
             {
               role: "system",
