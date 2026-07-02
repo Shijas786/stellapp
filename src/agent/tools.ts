@@ -829,7 +829,7 @@ export async function executeTool(
           messages: [
             {
               role: "system",
-              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully. VERY IMPORTANT RULES:\n1. Use `soroban_sdk::Vec::new(&env)` instead of `vec![]`.\n2. Do NOT use `Symbol::from_str`. Use `Symbol::new(&env, \"str\")` or `Symbol::short(\"str\")`.\n3. Always use `soroban_sdk::Address` for addresses, never `symbol::address` or `Address::from_str`.\n4. Panic using `panic!(\"msg\")`, do not use `panic_with_error` unless defined."
+              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully. VERY IMPORTANT RULES:\n1. Use `soroban_sdk::Vec::new(&env)` instead of `vec![]` and use `vec.push_back(val)` instead of `vec.push(val)`.\n2. Do NOT use `Symbol::from_str`. Use `soroban_sdk::symbol_short!(\"str\")` instead of `Symbol::short`.\n3. Always use `soroban_sdk::Address` for addresses, never `symbol::address` or `Address::from_str`.\n4. Panic using `panic!(\"msg\")`, do not use `panic_with_error` unless defined.\n5. NEVER use `env.storage().get()` or `env.storage().set()`. You MUST specify the storage type: `env.storage().instance().set(&key, &val)` or `env.storage().persistent().get(&key)`.\n6. For contractimpl traits, do NOT name your struct the same as a trait."
             },
             {
               role: "user",
