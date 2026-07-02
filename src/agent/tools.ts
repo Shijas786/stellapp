@@ -829,7 +829,7 @@ export async function executeTool(
           messages: [
             {
               role: "system",
-              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully."
+              content: "You are a senior Rust smart contract developer for Stellar Soroban (v21.7.7). Output ONLY the raw Rust source code. No markdown formatting, no backticks, no explanations. It must start with #![no_std] and compile successfully. VERY IMPORTANT RULES:\n1. Use `soroban_sdk::Vec::new(&env)` instead of `vec![]`.\n2. Do NOT use `Symbol::from_str`. Use `Symbol::new(&env, \"str\")` or `Symbol::short(\"str\")`.\n3. Always use `soroban_sdk::Address` for addresses, never `symbol::address` or `Address::from_str`.\n4. Panic using `panic!(\"msg\")`, do not use `panic_with_error` unless defined."
             },
             {
               role: "user",
