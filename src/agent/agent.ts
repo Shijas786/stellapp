@@ -28,6 +28,9 @@ type ActiveSkill = {
 // Note: Single-instance in-memory cache. Re-deploying will wipe pinned contexts.
 const activeSkillCache = new Map<string, ActiveSkill[]>();
 
+// Prevent concurrent modifications to history array while a long-running tool is active
+const activeLocks = new Set<string>();
+
 /**
  * Main AI agent runtime loop using OpenAI GPT-4o with tool calling capabilities.
  */
@@ -36,7 +39,13 @@ export async function runAgentLoop(
   userMessage: string,
   user: UserWalletData
 ): Promise<string> {
-  let history = chatHistories.get(chatId);
+  if (activeLocks.has(chatId)) {
+    return "⏳ Please wait, I am still processing your previous request. Building custom contracts can take up to 60 seconds!";
+  }
+  
+  activeLocks.add(chatId);
+  try {
+    let history = chatHistories.get(chatId);
 
   // Fetch saved contacts for this user dynamically on every turn
   const contacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
@@ -207,6 +216,9 @@ export async function runAgentLoop(
 
   // Return the final text message
   return assistantMessage.content || "I have processed your request.";
+  } finally {
+    activeLocks.delete(chatId);
+  }
 }
 
 /**
