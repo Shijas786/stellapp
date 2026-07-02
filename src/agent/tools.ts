@@ -329,6 +329,7 @@ export function setNotificationSender(sender: typeof sendNotification) {
 }
 
 export interface UserWalletData {
+  id: string;
   stellarPublic: string;
   stellarSecret: string; // Encrypted
   evmAddress: string;
@@ -498,6 +499,46 @@ export async function executeTool(
           ? `✅ Your account is fully activated and ready! XLM received and USDC trustline established. You can now send, receive, and swap USDC.`
           : `✅ Your account is activated (XLM received), but USDC trustline setup failed. Please type "activate my account" again to retry.`
       };
+    }
+
+    case "resolve_recipient": {
+      let recipient = args.recipient.trim();
+      if (recipient.startsWith("@")) recipient = recipient.substring(1);
+      const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
+      const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
+      
+      if (isPhone) {
+        const cleanPhone = cleanedRecipient;
+        let resolved = await prisma.user.findFirst({
+          where: { chatId: { startsWith: cleanPhone } }
+        });
+
+        if (!resolved) {
+          console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly for resolution...`);
+          
+          const newStellar = stellar.createStellarWallet();
+          const newEVM = evm.createEVMWallet();
+          const encStellarSecret = encrypt(newStellar.secretKey);
+          const encEVMPrivateKey = encrypt(newEVM.privateKey);
+
+          resolved = await prisma.user.create({
+            data: {
+              chatId: `${cleanPhone}@c.us`,
+              stellarPublic: newStellar.publicKey,
+              stellarSecret: encStellarSecret,
+              evmAddress: newEVM.address,
+              evmPrivateKey: encEVMPrivateKey,
+              onboarded: false
+            }
+          });
+          
+          return `Recipient resolved successfully. A new wallet was automatically generated for them.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
+        }
+        
+        return `Recipient resolved successfully.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
+      } else {
+        return `Recipient ${recipient} is not a valid phone number format.`;
+      }
     }
 
     case "send_stellar": {

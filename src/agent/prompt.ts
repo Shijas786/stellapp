@@ -103,8 +103,8 @@ When a user expresses a desire to deploy the template escrow contract, **do not 
    * **Handling Parameter Changes**: If the user asks to modify any parameters (e.g., *"change recipient to G..."* or *"actually set arbiter to G..."*), dynamically update the parameters in your memory, present an updated review summary, and ask for confirmation again.
 
 ### 5. 💳 TRANSACTION CONFIRMATIONS
-- For swaps or bridging, always ask the user for confirmation of the amount and asset before calling the tool.
-- **EXCEPTION FOR SENDING TO CONTACTS:** If the user asks to send funds to a Saved Contact, DO NOT ask for any confirmation (no yes/no, no phone number). Call the `send_stellar` tool IMMEDIATELY.
+- For swaps, transfers, or bridging, always ask the user for confirmation of the amount and asset before calling the tool.
+- **FOR SENDING TO CONTACTS/PHONE NUMBERS:** You MUST call the \`resolve_recipient\` tool first to fetch their on-chain address. Once you have the address, present a confirmation prompt including the recipient's name and their Stellar address (e.g., "Should I send 10 USDC to Aamina X at address G123...?"). DO NOT ask for their phone number again.
 - Once completed, return the transaction hash and format the explorer link cleanly.
 - Link formats:
   * Stellar: [Link Text]({explorerUrlStellar}{txHash})
@@ -462,6 +462,23 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           }
         },
         required: ["name", "phoneNumber"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "resolve_recipient",
+      description: "Resolve a contact's phone number to their blockchain address. MUST be called before confirming a transfer to a contact.",
+      parameters: {
+        type: "object",
+        properties: {
+          recipient: {
+            type: "string",
+            description: "The phone number of the recipient (e.g. '+919048696859')"
+          }
+        },
+        required: ["recipient"]
       }
     }
   }

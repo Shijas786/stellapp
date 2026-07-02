@@ -119,6 +119,7 @@ export async function handleIncomingMessage(
   // 2. Pass existing user messages to the AI Agent runtime
   try {
     const aiResponse = await runAgentLoop(chatId, text, {
+      id: user.id,
       stellarPublic: user.stellarPublic,
       stellarSecret: user.stellarSecret,
       evmAddress: user.evmAddress,
