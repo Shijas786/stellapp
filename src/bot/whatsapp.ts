@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { handleIncomingMessage } from "./controller";
-import { transcribeAudio, generateSpeech } from "../agent/agent";
+import { transcribeAudio, generateSpeech, injectContextMessage } from "../agent/agent";
 import { prisma } from "../services/db";
 
 export class WhatsAppBot {
@@ -194,6 +194,13 @@ export class WhatsAppBot {
                 });
                 savedCount++;
                 await msg.reply(`✅ Saved *${name}* (+${phoneNumber}) to your address book!`);
+                
+                // Inject context into the AI history so the next message
+                // (e.g. "send him 10 USDC") knows who was just saved.
+                injectContextMessage(
+                  msg.author || msg.from,
+                  `I just saved a new contact: *${name}* with phone number +${phoneNumber}. If the user refers to "him", "her", or "them" in their next message, they almost certainly mean ${name} (+${phoneNumber}).`
+                );
               }
             }
             if (savedCount > 0) return;

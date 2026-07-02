@@ -18,6 +18,22 @@ const openai = new OpenAI({ apiKey });
 // In-memory cache of user chat histories to preserve conversation context
 const chatHistories = new Map<string, OpenAI.Chat.ChatCompletionMessageParam[]>();
 
+/**
+ * Injects a silent context note into the AI's history for a given chatId.
+ * Used by non-AI flows (e.g. vCard saves) so the AI remembers recent events
+ * when the user's next message arrives.
+ */
+export function injectContextMessage(chatId: string, assistantNote: string): void {
+  const history = chatHistories.get(chatId);
+  if (history) {
+    // Inject as an assistant message so the AI treats it as its own prior knowledge
+    history.push({ role: "assistant", content: assistantNote });
+    console.log(`[Agent] Injected context for ${chatId}: ${assistantNote.substring(0, 80)}`);
+  }
+  // If no history exists yet (user hasn't messaged before), nothing to inject — 
+  // the system prompt will carry the contacts list anyway.
+}
+
 type ActiveSkill = {
   skillName: string;
   content: string;
