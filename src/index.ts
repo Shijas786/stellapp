@@ -165,6 +165,7 @@ http.createServer(async (_req, res) => {
     }
     
     const dashboardPath = path.join(process.cwd(), "dashboard", "out", targetPath);
+    console.log(`[Dashboard Route] Request: ${parsedUrl.pathname} -> looking for: ${dashboardPath}`);
     if (fs.existsSync(dashboardPath)) {
       const ext = path.extname(dashboardPath);
       let contentType = "text/html; charset=utf-8";
@@ -179,8 +180,19 @@ http.createServer(async (_req, res) => {
       res.writeHead(200, { "Content-Type": contentType });
       res.end(fs.readFileSync(dashboardPath));
     } else {
+      let debugInfo = `Dashboard Not Found. path=${dashboardPath}. cwd=${process.cwd()}`;
+      try {
+        const outPath = path.join(process.cwd(), "dashboard", "out");
+        if (fs.existsSync(outPath)) {
+          debugInfo += `<br>Files in out folder: ` + fs.readdirSync(outPath).join(", ");
+        } else {
+          debugInfo += `<br>The dashboard/out folder DOES NOT EXIST!`;
+        }
+      } catch (err) {
+        debugInfo += `<br>Error checking folder: ${err.message}`;
+      }
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<h2>Dashboard Not Found</h2><p>Please run <code>npm run build</code> to build the Next.js dashboard first.</p>");
+      res.end(`<h2>Dashboard Not Found</h2><p>${debugInfo}</p><p>Please run <code>npm run build</code> to build the Next.js dashboard first.</p>`);
     }
     return;
   }
