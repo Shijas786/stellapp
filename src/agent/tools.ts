@@ -561,28 +561,7 @@ export async function executeTool(
         }
 
         if (!resolved) {
-          console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly for resolution...`);
-          
-          const newStellar = stellar.createStellarWallet();
-          const newEVM = evm.createEVMWallet();
-          const encStellarSecret = encrypt(newStellar.secretKey);
-          const encEVMPrivateKey = encrypt(newEVM.privateKey);
-
-          // Use upsert so concurrent calls don't create two records for the same number
-          resolved = await prisma.user.upsert({
-            where: { chatId: `${cleanPhone}@c.us` },
-            create: {
-              chatId: `${cleanPhone}@c.us`,
-              stellarPublic: newStellar.publicKey,
-              stellarSecret: encStellarSecret,
-              evmAddress: newEVM.address,
-              evmPrivateKey: encEVMPrivateKey,
-              onboarded: false
-            },
-            update: {} // no-op if already exists
-          });
-          
-          return `Recipient resolved successfully. A new wallet was automatically generated for them.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
+          return `Error: Recipient phone number +${cleanPhone} is not registered on the bot yet. They must message the bot first to activate their account and get a wallet.`;
         }
         
         return `Recipient resolved successfully.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
@@ -690,29 +669,7 @@ export async function executeTool(
           }
 
           if (!resolvedUser) {
-            console.log(`[Tools] Phone number ${cleanPhone} not registered. Generating wallets on-the-fly...`);
-            
-            // 1. Generate wallets
-            const newStellar = stellar.createStellarWallet();
-            const newEVM = evm.createEVMWallet();
-
-            // 2. Encrypt private keys
-            const encStellarSecret = encrypt(newStellar.secretKey);
-            const encEVMPrivateKey = encrypt(newEVM.privateKey);
-
-            // 3. Use upsert to prevent race-condition duplicates
-            resolvedUser = await prisma.user.upsert({
-              where: { chatId: `${cleanPhone}@c.us` },
-              create: {
-                chatId: `${cleanPhone}@c.us`,
-                stellarPublic: newStellar.publicKey,
-                stellarSecret: encStellarSecret,
-                evmAddress: newEVM.address,
-                evmPrivateKey: encEVMPrivateKey,
-                onboarded: false
-              },
-              update: {} // no-op if already exists
-            });
+            throw new Error(`Recipient phone number +${cleanPhone} is not registered on the bot yet. They must message the bot first to activate their account and get a wallet.`);
           }
 
           console.log(`[Tools] Resolved phone number '${recipient}' to public address: ${resolvedUser.stellarPublic}`);
