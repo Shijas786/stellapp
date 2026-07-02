@@ -146,17 +146,19 @@ http.createServer(async (_req, res) => {
   if (_req.method === "GET" && parsedUrl.pathname === "/api/auth/fix-accounts") {
     try {
       const allUsers = await prisma.user.findMany();
-      const orphans = allUsers.filter(u => u.chatId.length <= 15 && u.onboarded === false);
+      // Find short orphans (assumed to be the ones without country code)
+      const orphans = allUsers.filter(u => u.chatId.length <= 15 && u.chatId.endsWith("@c.us"));
       let fixed = 0;
       let logs = [];
       
       for (const orphan of orphans) {
         const rawNumber = orphan.chatId.replace("@c.us", "");
         
+        // Find any other account that ends with this raw number and is longer (has country code)
         const realAccount = allUsers.find(u => 
           u.chatId !== orphan.chatId && 
           u.chatId.endsWith(`${rawNumber}@c.us`) &&
-          u.onboarded === true
+          u.chatId.length > orphan.chatId.length
         );
         
         if (realAccount) {
