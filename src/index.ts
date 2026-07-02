@@ -15,6 +15,19 @@ console.log("=========================================");
 console.log("Starting Stellar WhatsApp AI Bot...");
 console.log("=========================================");
 
+async function logConfidentialRegistries() {
+  try {
+    const registries = await prisma.confidentialRegistry.findMany();
+    console.log("=========================================");
+    console.log("[ZK Diagnostic] Active Confidential registries in DB:");
+    console.log(JSON.stringify(registries, null, 2));
+    console.log("=========================================");
+  } catch (err) {
+    console.error("[ZK Diagnostic] Failed to log registries:", err);
+  }
+}
+logConfidentialRegistries();
+
 // 1. Initialize WhatsApp Adapter
 const bot = new WhatsAppBot();
 
