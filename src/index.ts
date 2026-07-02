@@ -178,8 +178,11 @@ http.createServer(async (_req, res) => {
       
       res.writeHead(200, { "Content-Type": contentType });
       res.end(fs.readFileSync(dashboardPath));
-      return;
+    } else {
+      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<h2>Dashboard Not Found</h2><p>Please run <code>npm run build</code> to build the Next.js dashboard first.</p>");
     }
+    return;
   }
 
   // 4. Serve Public Assets (CSS, JS, Images)
