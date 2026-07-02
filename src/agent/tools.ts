@@ -505,6 +505,40 @@ export async function executeTool(
     case "resolve_recipient": {
       let recipient = args.recipient.trim();
       if (recipient.startsWith("@")) recipient = recipient.substring(1);
+
+      // 1. Resolve contact name to phone number/address if it's not a phone number or Stellar key
+      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
+        const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
+        
+        if (!isPhone) {
+          const contact = await prisma.contact.findFirst({
+            where: {
+              ownerId: user.id,
+              name: { equals: recipient.toLowerCase() }
+            }
+          });
+          if (contact) {
+            recipient = contact.phoneNumber;
+          } else {
+            const allContacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
+            const matched = allContacts.find(c => 
+              c.name.includes(recipient.toLowerCase()) || 
+              recipient.toLowerCase().includes(c.name)
+            );
+            if (matched) {
+              recipient = matched.phoneNumber;
+            } else {
+              return `Error: Contact "${recipient}" was not found in your address book.`;
+            }
+          }
+        }
+      }
+
+      if (recipient.startsWith("G") || recipient.startsWith("C")) {
+        return `Recipient resolved successfully.\nStellar Address: ${recipient}`;
+      }
+
       const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
       const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
       
@@ -553,8 +587,33 @@ export async function executeTool(
         
         return `Recipient resolved successfully.\nStellar Address: ${resolved.stellarPublic}\nEVM Address: ${resolved.evmAddress}`;
       } else {
-        return `Recipient ${recipient} is not a valid phone number format.`;
+        return `Recipient ${recipient} is not a valid phone number or address format.`;
       }
+    }
+
+    case "set_session_state": {
+      const key = args.key;
+      const value = args.value;
+      const record = await prisma.sessionState.findUnique({ where: { chatId } });
+      let state: Record<string, string> = {};
+      if (record) {
+        state = JSON.parse(record.stateJson);
+      }
+      state[key] = value;
+      await prisma.sessionState.upsert({
+        where: { chatId },
+        create: { chatId, stateJson: JSON.stringify(state) },
+        update: { stateJson: JSON.stringify(state) }
+      });
+      return `Successfully saved session parameter: ${key} = ${value}`;
+    }
+
+    case "get_session_state": {
+      const key = args.key;
+      const record = await prisma.sessionState.findUnique({ where: { chatId } });
+      if (!record) return `No session state found.`;
+      const state: Record<string, string> = JSON.parse(record.stateJson);
+      return state[key] !== undefined ? state[key] : `Key "${key}" not found in session state.`;
     }
 
     case "send_stellar": {

@@ -63,17 +63,10 @@ export async function runAgentLoop(
   try {
     let history = chatHistories.get(chatId);
 
-  // Fetch saved contacts for this user dynamically on every turn
-  const contacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
-  const contactsList = contacts.length > 0 
-    ? contacts.map(c => `- ${c.name}: ${c.phoneNumber}`).join("\n") 
-    : "No saved contacts yet.";
-
   // 1. Initialize or update history with formatted system prompt
   const formattedSystemPrompt = SYSTEM_PROMPT
     .replace("{{stellarPublic}}", user.stellarPublic)
-    .replace("{{evmAddress}}", user.evmAddress)
-    .replace("{{savedContacts}}", contactsList);
+    .replace("{{evmAddress}}", user.evmAddress);
 
   if (!history) {
     history = [

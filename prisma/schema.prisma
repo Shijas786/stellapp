@@ -22,6 +22,13 @@ model User {
   deposits       PrivacyDeposit[]
 }
 
+// Stores conversation/session state for WhatsApp chat workflows
+model SessionState {
+  chatId    String   @id
+  stateJson String   // JSON-serialized state
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
 model Contact {
   id          String   @id @default(uuid())
   ownerId     String
