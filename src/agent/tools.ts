@@ -587,16 +587,19 @@ export async function executeTool(
                 onboarded: false
               }
             });
+          }
 
-            // 4. Fund Stellar account
+          // 4. Fund Stellar account if it is not activated on the ledger
+          const isActivated = await stellar.isAccountActivated(resolved.stellarPublic);
+          if (!isActivated) {
             if (!config.isMainnet) {
-              console.log(`[Tools] Funding pre-created account on testnet: ${newStellar.publicKey}`);
-              await stellar.fundStellarAccount(newStellar.publicKey);
+              console.log(`[Tools] Funding pre-created account on testnet: ${resolved.stellarPublic}`);
+              await stellar.fundStellarAccount(resolved.stellarPublic);
               console.log(`[Tools] Establishing USDC trustline for pre-created account...`);
-              await stellar.ensureUSDCTrustline(newStellar.secretKey);
+              await stellar.ensureUSDCTrustline(decrypt(resolved.stellarSecret));
             } else {
               isGhostOnboardedOnMainnet = true;
-              ghostSecret = newStellar.secretKey;
+              ghostSecret = decrypt(resolved.stellarSecret);
             }
           }
 
