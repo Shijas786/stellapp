@@ -65,8 +65,7 @@ export async function runAgentLoop(
 
   // 1. Initialize or update history with formatted system prompt
   const formattedSystemPrompt = SYSTEM_PROMPT
-    .replace("{{stellarPublic}}", user.stellarPublic)
-    .replace("{{evmAddress}}", user.evmAddress);
+    .replace("{{stellarPublic}}", user.stellarPublic);
 
   if (!history) {
     history = [

@@ -333,8 +333,8 @@ export interface UserWalletData {
   id: string;
   stellarPublic: string;
   stellarSecret: string; // Encrypted
-  evmAddress: string;
-  evmPrivateKey: string; // Encrypted
+  evmAddress?: string | null;
+  evmPrivateKey?: string | null; // Encrypted
 }
 
 /**
@@ -447,7 +447,7 @@ export async function executeTool(
 
     case "get_balances": {
       const stellarBalances = await stellar.getBalances(user.stellarPublic);
-      const evmBalances = await evm.getEVMBalances(user.evmAddress);
+      const evmBalances = user.evmAddress ? await evm.getEVMBalances(user.evmAddress) : null;
       return {
         stellar: stellarBalances,
         evm: evmBalances
@@ -457,8 +457,7 @@ export async function executeTool(
     case "get_wallet_address": {
       return {
         stellarAddress: user.stellarPublic,
-        evmAddress: user.evmAddress,
-        message: `Your wallet addresses:\n\nStellar: ${user.stellarPublic}\nEVM: ${user.evmAddress}`
+        message: `Your wallet address:\n\nStellar: ${user.stellarPublic}`
       };
     }
 
@@ -755,6 +754,9 @@ export async function executeTool(
     }
 
     case "bridge_evm_to_stellar": {
+      if (!user.evmPrivateKey || !user.evmAddress) {
+        throw new Error("Bridge capability requires an EVM wallet which is not configured for your account.");
+      }
       const evmPrivateKey = decrypt(user.evmPrivateKey);
       const stellarSecret = decrypt(user.stellarSecret);
 
@@ -781,6 +783,9 @@ export async function executeTool(
     }
 
     case "bridge_stellar_to_evm": {
+      if (!user.evmPrivateKey || !user.evmAddress) {
+        throw new Error("Bridge capability requires an EVM wallet which is not configured for your account.");
+      }
       const evmPrivateKey = decrypt(user.evmPrivateKey);
       const stellarSecret = decrypt(user.stellarSecret);
 

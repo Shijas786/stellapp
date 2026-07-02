@@ -58,7 +58,15 @@ export async function handleIncomingMessage(
   const isNewUser = !user || !user.onboarded;
 
   if (isNewUser) {
-    console.log(`[Controller] Onboarding user: ${chatId} (${contactName})`);
+    const cleanText = text.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "");
+    if (cleanText !== "create wallet") {
+      return `👋 *Welcome to Stellapp!* 🚀\n\n` +
+        `Your personal crypto companion, right inside WhatsApp. You can check balances, send payments, swap tokens on the Stellar DEX, perform private zero-knowledge transactions, and deploy smart contracts just by texting or sending a voice note. 🎙️\n\n` +
+        `To get started and generate your secure Stellar wallet, please reply:\n` +
+        `👉 *"create wallet"*`;
+    }
+
+    console.log(`[Controller] Creating wallet for user: ${chatId} (${contactName})`);
     
     // Generate default username from WhatsApp profile name
     let defaultUsername: string | null = contactName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -71,25 +79,16 @@ export async function handleIncomingMessage(
         where: { username: defaultUsername }
       });
       if (taken) {
-        // Append last 4 digits of phone number to make it unique
         const cleanNumber = chatId.split("@")[0].slice(-4);
         defaultUsername = `${defaultUsername}${cleanNumber}`;
       }
     }
 
     if (!user) {
-      // Generate Stellar keys
+      // Generate Stellar keys (EVM removed entirely)
       const stellarWallet = createStellarWallet();
-      
-      // Generate EVM keys
-      const evmWallet = createEVMWallet();
-
-      // Encrypt private keys
       const encryptedStellarSecret = encrypt(stellarWallet.secretKey);
-      const encryptedEVMPrivateKey = encrypt(evmWallet.privateKey);
 
-      // Use upsert to guard against race conditions where two simultaneous messages
-      // from the same user could attempt to insert the same chatId twice.
       try {
         user = await prisma.user.upsert({
           where: { chatId },
@@ -98,25 +97,20 @@ export async function handleIncomingMessage(
             username: defaultUsername,
             stellarPublic: stellarWallet.publicKey,
             stellarSecret: encryptedStellarSecret,
-            evmAddress: evmWallet.address,
-            evmPrivateKey: encryptedEVMPrivateKey,
             onboarded: true
           },
           update: {
-            // If record somehow already exists (race), just mark as onboarded
             onboarded: true,
             username: defaultUsername ?? undefined
           }
         });
       } catch (createErr: any) {
-        // Last-resort fallback: if upsert itself fails, fetch the existing record
         console.error(`[Controller] upsert failed, fetching existing record:`, createErr.message);
         user = await prisma.user.findUnique({ where: { chatId } });
         if (!user) throw createErr;
       }
       console.log(`[Controller] New user wallet created: ${user.stellarPublic}`);
     } else {
-      // Update existing pre-created user to onboarded = true
       user = await prisma.user.update({
         where: { chatId },
         data: {
@@ -128,8 +122,6 @@ export async function handleIncomingMessage(
     }
 
     const networkNameStellar = config.isMainnet ? "Mainnet" : "Testnet";
-    const networkNameEVM = config.isMainnet ? "Base Mainnet" : "Base Sepolia";
-
     let fundingStatus = "";
     if (!config.isMainnet) {
       console.log(`[Controller] Funding Stellar account on Testnet for: ${user.stellarPublic}`);
@@ -143,7 +135,7 @@ export async function handleIncomingMessage(
         }
       }
       fundingStatus = funded 
-        ? "🎁 I've funded your Stellar wallet with *10,000 Testnet XLM* and a USDC Trustline so you can start immediately!" 
+        ? "🎁 I've funded your Stellar wallet with *10,000 Testnet XLM* and a USDC trustline so you can start immediately!" 
         : "⚠️ I tried to fund your Stellar account with testnet XLM but Friendbot was busy. Try typing 'fund me' in a moment!";
     } else {
       fundingStatus = `⚠️ *Account Not Yet Active*\n\nTo activate your Stellar wallet, please send a minimum of *2 XLM* to your address:\n\n\`${user.stellarPublic}\`\n\nOnce received, type: *"activate my account"* and I'll set up everything automatically (USDC trustline, etc.).`;
@@ -153,14 +145,14 @@ export async function handleIncomingMessage(
       ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*stellapp.com\`)\n\n`
       : "";
 
-    return `👋 *Welcome to Stellapp!* 🚀\n\n` +
-      `Your personal crypto wallet, right inside WhatsApp. You can send payments, swap tokens, bridge between networks, and even deploy smart contracts just by texting or sending a voice note. 🎙️\n\n` +
-      `I've securely generated your wallets:\n\n` +
-      `✨ *Stellar (${networkNameStellar}):*\n\`${user.stellarPublic}\`\n\n` +
-      `⛓️ *EVM (${networkNameEVM}):*\n\`${user.evmAddress}\`\n\n` +
+    return `👋 *Stellapp Wallet Created!* 🚀\n\n` +
+      `Your personal Stellar wallet has been securely initialized:\n\n` +
+      `✨ *Stellar Address:* \n\`${user.stellarPublic}\`\n\n` +
       usernameStatus +
       `${fundingStatus}\n\n` +
-      `💡 *Try sending:* "What's my balance?", "Send 10 USDC to John", or "Deploy an escrow contract for 2 days"`;
+      `🔒 *ZK Confidential Transfers Enabled:*\n` +
+      `You can now perform fully private zero-knowledge transactions for both XLM and USDC.\n\n` +
+      `💡 *Try sending:* "What's my balance?", "Send 10 USDC to Bob", "Register me for USDC confidential", or "Deploy an escrow contract"`;
   }
 
   if (!user) {
