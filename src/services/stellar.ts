@@ -364,68 +364,26 @@ export async function deployEscrowContract(
   arbiterAddress: string,
   maxAmount: string
 ): Promise<{ contractId: string; txHash: string }> {
-  const wasmHash = process.env.ESCROW_WASM_HASH;
-  if (!wasmHash || wasmHash.startsWith("00000000")) {
-    throw new Error("ESCROW_WASM_HASH is not set or is invalid in .env file.");
+  const wasmPath = path.join(
+    process.cwd(),
+    "src/contracts/escrow/target/wasm32-unknown-unknown/release/soroban_escrow_contract.wasm"
+  );
+  
+  if (!fs.existsSync(wasmPath)) {
+    throw new Error(`Escrow WASM not found at: ${wasmPath}. Please compile it first.`);
   }
+
+  const wasmBytes = fs.readFileSync(wasmPath);
+  console.log(`[Stellar] Uploading Escrow WASM (${wasmBytes.length} bytes)...`);
+  const { wasmHash } = await uploadWasm(secretKey, wasmBytes);
+  console.log(`[Stellar] WASM uploaded. Hash: ${wasmHash}`);
+
+  console.log(`[Stellar] Instantiating Escrow contract...`);
+  const { contractId } = await instantiateContract(secretKey, wasmHash);
+  console.log(`[Stellar] Contract instantiated. ID: ${contractId}`);
 
   const sourceKeypair = Keypair.fromSecret(secretKey);
   const publicKey = sourceKeypair.publicKey();
-  const account = await horizonServer.loadAccount(publicKey);
-  const salt = crypto.randomBytes(32);
-
-  const deployOp = Operation.createCustomContract({
-    address: Address.fromString(publicKey),
-    wasmHash: Buffer.from(wasmHash, "hex"),
-    salt
-  });
-
-  let tx: any = new TransactionBuilder(account, {
-    fee: BASE_FEE,
-    networkPassphrase: PASSPHRASE
-  })
-    .addOperation(deployOp)
-    .setTimeout(60)
-    .build();
-
-  const simulation = await rpcServer.simulateTransaction(tx);
-  if (rpc.Api.isSimulationError(simulation)) {
-    throw new Error(`Escrow simulation failed: ${simulation.error}`);
-  }
-
-  // Extract contractId from simulation retval BEFORE sending (avoids Protocol 23 XDR crash)
-  const simSuccess = simulation as rpc.Api.SimulateTransactionSuccessResponse;
-  const retval = simSuccess.result?.retval;
-  if (!retval) throw new Error("Simulation did not return a contract address.");
-  const contractId = Address.fromScVal(retval).toString();
-
-  // assembleTransaction returns TransactionBuilder — must call .build()
-  tx = rpc.assembleTransaction(tx, simulation).build();
-  tx.sign(sourceKeypair);
-
-  const sendResult = await rpcServer.sendTransaction(tx);
-  if (sendResult.status === "ERROR") {
-    throw new Error(`Escrow deploy send failed: ${JSON.stringify(sendResult.errorResult)}`);
-  }
-
-  // Raw axios poll — rpcServer.getTransaction() crashes on Protocol 23+ TransactionMetaV4
-  const rpcUrl = config.stellarRpcUrl;
-  let pollStatus = "PENDING";
-  let attempts = 0;
-  while (pollStatus !== "SUCCESS" && pollStatus !== "FAILED" && attempts < 20) {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const resp = await axios.post(rpcUrl, {
-      jsonrpc: "2.0", id: 1,
-      method: "getTransaction",
-      params: { hash: sendResult.hash }
-    });
-    pollStatus = resp.data?.result?.status ?? "NOT_FOUND";
-    attempts++;
-  }
-
-  if (pollStatus !== "SUCCESS") {
-    throw new Error(`Escrow deployment failed to finalize. Status: ${pollStatus}`);
-  }
 
   // Initialize the escrow contract
   const usdcContractId = USDC_ASSET.contractId(PASSPHRASE);
@@ -703,14 +661,13 @@ export async function deployPrivacyPool(
 
   const usdcContractId = USDC_ASSET.contractId(PASSPHRASE);
   const publicKey = Keypair.fromSecret(secretKey).publicKey();
-  console.log(`[Stellar] Initializing Privacy Pool with Admin: ${publicKey} and USDC Contract ID: ${usdcContractId}`);
+  console.log(`[Stellar] Initializing Privacy Pool with USDC Contract ID: ${usdcContractId}`);
 
   const initTx = await invokeContractMethod(
     secretKey,
     contractId,
     "initialize",
     [
-      xdr.ScVal.scvAddress(Address.fromString(publicKey).toScAddress()),
       xdr.ScVal.scvAddress(Address.fromString(usdcContractId).toScAddress())
     ]
   );
