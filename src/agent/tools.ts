@@ -510,7 +510,7 @@ export async function executeTool(
       if (isPhone) {
         const cleanPhone = cleanedRecipient;
         let resolved = await prisma.user.findFirst({
-          where: { chatId: { startsWith: cleanPhone } }
+          where: { chatId: { endsWith: `${cleanPhone}@c.us` } }
         });
 
         if (!resolved) {
@@ -562,7 +562,7 @@ export async function executeTool(
           resolvedUser = await prisma.user.findFirst({
             where: {
               chatId: {
-                startsWith: cleanPhone
+                endsWith: `${cleanPhone}@c.us`
               }
             }
           });

@@ -18,6 +18,28 @@ export async function handleIncomingMessage(
     where: { chatId }
   });
 
+  // Healing logic: If user is not found, check if there's an orphaned account created by tools.ts
+  if (!user) {
+    const rawNumber = chatId.replace("@c.us", "");
+    const localNumber = rawNumber.length >= 10 ? rawNumber.slice(-10) : rawNumber;
+    const possibleOrphan = await prisma.user.findFirst({
+      where: {
+        chatId: {
+          endsWith: `${localNumber}@c.us`
+        },
+        onboarded: false
+      }
+    });
+
+    if (possibleOrphan) {
+      console.log(`[Controller] Healing orphaned account: ${possibleOrphan.chatId} -> ${chatId}`);
+      user = await prisma.user.update({
+        where: { id: possibleOrphan.id },
+        data: { chatId: chatId }
+      });
+    }
+  }
+
   const isNewUser = !user || !user.onboarded;
 
   if (isNewUser) {
