@@ -19,6 +19,7 @@ model User {
   updatedAt      DateTime @updatedAt
   onboarded      Boolean  @default(false)
   contacts       Contact[]
+  deposits       PrivacyDeposit[]
 }
 
 model Contact {
@@ -30,4 +31,18 @@ model Contact {
   createdAt   DateTime @default(now())
 
   @@unique([ownerId, name])
+}
+
+// Stores ZK Privacy Pool deposit commitments for Merkle proof reconstruction on withdrawal
+model PrivacyDeposit {
+  id            String   @id @default(uuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contractId    String   // Stellar privacy pool contract ID
+  commitmentHex String   // The on-chain commitment hash (hex)
+  leafIndex     Int      @default(0) // Position in the Merkle tree (0-based)
+  amount        String   // Amount of USDC deposited
+  nullifierHash String?  // Set after withdrawal to prevent double-spend tracking
+  spent         Boolean  @default(false)
+  createdAt     DateTime @default(now())
 }

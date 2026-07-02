@@ -9,3 +9,13 @@ scratch/
 target/
 *.wasm
 compiler_template/target/
+
+# Exception: pre-compiled privacy pool WASM must ship to production
+!contracts/privacy_pool/target/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/release/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm
+
+# Exception: ZK circuits must ship to production
+!circuits/
+!circuits/**

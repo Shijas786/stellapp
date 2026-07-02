@@ -971,7 +971,13 @@ export async function executeTool(
       let commitmentHex = BigInt(commitment).toString(16);
       while(commitmentHex.length < 64) commitmentHex = "0" + commitmentHex;
 
-      // 4. Perform deposit
+      // Count existing deposits for this pool to determine the leaf index
+      const existingDeposits = await prisma.privacyDeposit.count({
+        where: { contractId: args.contractId }
+      });
+      const leafIndex = existingDeposits; // 0-based index in Merkle tree
+
+      // Perform deposit on-chain
       const txHash = await stellar.depositToPrivacyPool(
         stellarSecret,
         args.contractId,
@@ -979,7 +985,19 @@ export async function executeTool(
         amountStr
       );
 
-      // 5. Generate client secret note format
+      // Save commitment to DB for Merkle path reconstruction on withdraw
+      await prisma.privacyDeposit.create({
+        data: {
+          ownerId: user.id,
+          contractId: args.contractId,
+          commitmentHex,
+          leafIndex,
+          amount: amountStr,
+          spent: false
+        }
+      });
+
+      // Generate client secret note format
       const secretNote = `stellapp-zk-v1_${args.contractId}_${amountStr}_${secret}_${nullifier}`;
 
       return {
@@ -1007,12 +1025,37 @@ export async function executeTool(
       const secret = parts[3];
       const nullifier = parts[4];
 
-      // For the demo, we assume an empty tree. The root is computed by hashing the commitment up the tree.
-      // In a real app, we'd query the off-chain DB for the Merkle path.
-      // To keep the hackathon demo simple, we assume the bot provides empty paths.
+      // Recompute commitment from secret + nullifier
       const commitment = await zkPool.recomputeCommitment(secret, nullifier);
-      const pathElements = ["0", "0", "0", "0"]; // Mock paths for demo
-      const pathIndices = ["0", "0", "0", "0"];
+      let commitmentHex = BigInt(commitment).toString(16);
+      while(commitmentHex.length < 64) commitmentHex = "0" + commitmentHex;
+
+      // Fetch all deposits for this pool from DB to reconstruct real Merkle path
+      const allDeposits = await prisma.privacyDeposit.findMany({
+        where: { contractId },
+        orderBy: { leafIndex: "asc" }
+      });
+
+      // Find this deposit's record
+      const depositRecord = allDeposits.find(d => d.commitmentHex === commitmentHex);
+      if (!depositRecord) {
+        throw new Error("Deposit not found in database. The secret note may be invalid or from a different instance.");
+      }
+      if (depositRecord.spent) {
+        throw new Error("This deposit has already been withdrawn. Cannot double-spend.");
+      }
+
+      // Build Merkle path using sibling commitments
+      // For a simple linear tree of depth 4, path is the sibling commitment at each level
+      const leafIndex = depositRecord.leafIndex;
+      // Use sibling (the other leaf at the same level) or "0" if there's no sibling
+      const siblingIndex = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
+      const sibling = allDeposits.find(d => d.leafIndex === siblingIndex);
+      const siblingHex = sibling ? sibling.commitmentHex : "0";
+      // Pad path to depth 4 with zeros
+      const pathElements = [siblingHex, "0", "0", "0"];
+      const pathIndices = [String(leafIndex % 2), "0", "0", "0"];
+
       const currentRoot = await zkPool.computeRoot(commitment, pathElements);
 
       // Generate the ZK proof off-chain!
@@ -1035,6 +1078,12 @@ export async function executeTool(
         publicSignals,
         nullifierHash
       );
+
+      // Mark the deposit as spent to prevent double-withdrawal
+      await prisma.privacyDeposit.update({
+        where: { id: depositRecord.id },
+        data: { spent: true, nullifierHash }
+      });
 
       return {
         success: true,
