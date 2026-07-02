@@ -13,6 +13,7 @@ import OpenAI from "openai";
 import { exec } from "child_process";
 import * as templates from "./templates";
 import * as zkPool from "../services/zk_pool";
+import * as confidentialToken from "../services/confidential_token";
 
 
 // ============================================================
@@ -1097,6 +1098,142 @@ export async function executeTool(
         txHash,
         explorerUrl: `${config.explorerUrlStellar}${txHash}`,
         message: `Successfully withdrew ${amountStr} ${depositRecord.assetCode} from the Privacy Pool! 🎉`
+      };
+    }
+
+    case "confidential_register": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      await sendNotification(chatId, "⏳ *Generating registration ZK proof...*\n\nThis involves deriving your confidential spending/viewing keys and submitting a ZK registration proof to the Stellar contract. It takes 15-20 seconds.");
+      const txHash = await confidentialToken.registerConfidential(stellarSecret);
+      return {
+        success: true,
+        txHash,
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: `Successfully registered for ZK confidential transfers! 🎉\n\nTx: ${txHash.slice(0, 8)}...`
+      };
+    }
+
+    case "confidential_deposit": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      const amountStr = args.amount;
+      await sendNotification(chatId, `⏳ *Depositing ${amountStr} XLM into ZK receiving balance...*`);
+      const txHash = await confidentialToken.depositConfidential(stellarSecret, amountStr);
+      return {
+        success: true,
+        txHash,
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: `Successfully deposited ${amountStr} XLM into your confidential receiving balance! 🤫\n\n*Note*: You must call "merge" to fold this receiving balance into your spendable balance before you can spend it.`
+      };
+    }
+
+    case "confidential_merge": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      await sendNotification(chatId, "⏳ *Merging receiving balance into spendable...*");
+      const txHash = await confidentialToken.mergeConfidential(stellarSecret);
+      return {
+        success: true,
+        txHash,
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: "Successfully folded receiving balance into your spendable balance! 🤫"
+      };
+    }
+
+    case "confidential_balance": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      const balances = await confidentialToken.getConfidentialBalances(stellarSecret);
+      return {
+        success: true,
+        ...balances,
+        message: `*🔒 ZK Private Balance*\n\n• *Spendable*: ${balances.spendable} XLM\n• *Receiving*: ${balances.receiving} XLM\n\n• *Registered*: ${balances.registered ? "Yes ✅" : "No ❌"}`
+      };
+    }
+
+    case "confidential_transfer": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      const amountStr = args.amount;
+      let recipient = args.recipient.trim().replace(/^@/, "");
+
+      // Resolve contact name to phone number
+      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
+        const isPhone = /^[0-9]{10,18}$/.test(cleanedForPhone);
+        
+        if (!isPhone) {
+          const contact = await prisma.contact.findFirst({
+            where: {
+              ownerId: user.id,
+              name: { equals: recipient.toLowerCase() }
+            }
+          });
+          
+          if (!contact) {
+            const allContacts = await prisma.contact.findMany({ where: { ownerId: user.id } });
+            const matched = allContacts.find(c => 
+              c.name.includes(recipient.toLowerCase()) || 
+              recipient.toLowerCase().includes(c.name)
+            );
+            if (matched) {
+              recipient = matched.phoneNumber;
+            } else {
+              throw new Error(`Contact "${recipient}" not found. Please save their number first.`);
+            }
+          } else {
+            recipient = contact.phoneNumber;
+          }
+        }
+      }
+
+      // Resolve phone number to Stellar address
+      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
+        const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
+        if (isPhone) {
+          const cleanPhone = cleanedRecipient;
+          let resolvedUser = await prisma.user.findFirst({
+            where: { chatId: { endsWith: `${cleanPhone}@c.us` } }
+          });
+          if (!resolvedUser) {
+            const allPhoneUsers = await prisma.user.findMany({
+              where: { chatId: { endsWith: "@c.us" } }
+            });
+            resolvedUser = allPhoneUsers.find(u => {
+              const num = u.chatId.replace("@c.us", "");
+              return num.endsWith(cleanPhone) || cleanPhone.endsWith(num);
+            }) ?? null;
+          }
+          if (!resolvedUser) {
+            throw new Error(`Recipient phone number ${cleanPhone} does not have an account yet.`);
+          }
+          recipient = resolvedUser.stellarPublic;
+        } else {
+          throw new Error(`Invalid recipient. Must be contact name, phone number, or G-address.`);
+        }
+      }
+
+      await sendNotification(chatId, `⏳ *Generating ZK proof for private transfer of ${amountStr} XLM...*\n\nThis derives ephemeral ECDH keys and solves UltraHonk witnesses. It takes 15-20 seconds.`);
+      const txHash = await confidentialToken.transferConfidential(stellarSecret, recipient, amountStr);
+      
+      return {
+        success: true,
+        txHash,
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: `Successfully transferred ${amountStr} XLM privately! 🔒\n\nThe transaction is finalized on-chain with hidden amounts and balances.`
+      };
+    }
+
+    case "confidential_withdraw": {
+      const stellarSecret = decrypt(user.stellarSecret);
+      const amountStr = args.amount;
+      const recipient = args.recipient;
+
+      await sendNotification(chatId, `⏳ *Generating ZK proof for confidential withdrawal of ${amountStr} XLM...*\n\nThis solves the UltraHonk withdraw witness. It takes 15-20 seconds.`);
+      const txHash = await confidentialToken.withdrawConfidential(stellarSecret, recipient, amountStr);
+
+      return {
+        success: true,
+        txHash,
+        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
+        message: `Successfully withdrew ${amountStr} XLM confidentially to public address ${recipient}! 🔓\n\nTx: ${txHash.slice(0, 8)}...`
       };
     }
 
