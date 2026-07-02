@@ -74,6 +74,67 @@ http.createServer(async (_req, res) => {
     return;
   }
 
+  // 2.5 Auth API Endpoints (Dashboard Login)
+  if (_req.method === "POST" && parsedUrl.pathname === "/api/auth/request-otp") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    let body = "";
+    _req.on("data", chunk => body += chunk.toString());
+    _req.on("end", async () => {
+      try {
+        const { phoneNumber } = JSON.parse(body);
+        const { generateOTP } = require("./services/auth");
+        const code = generateOTP(phoneNumber);
+        
+        // Send OTP via WhatsApp
+        const waId = `${phoneNumber.replace(/\D/g, "")}@c.us`;
+        await bot.sendMessage(waId, `🔐 Your Stellapp dashboard login code is: *${code}*.\n\nThis code will expire in 5 minutes.`);
+        
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, message: "OTP sent" }));
+      } catch (err: any) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (_req.method === "POST" && parsedUrl.pathname === "/api/auth/verify-otp") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    let body = "";
+    _req.on("data", chunk => body += chunk.toString());
+    _req.on("end", async () => {
+      try {
+        const { phoneNumber, code } = JSON.parse(body);
+        const { validateOTP, issueToken } = require("./services/auth");
+        
+        if (validateOTP(phoneNumber, code)) {
+          const token = issueToken(phoneNumber);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, token }));
+        } else {
+          res.writeHead(401, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Invalid or expired OTP" }));
+        }
+      } catch (err: any) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Handle CORS Preflight for the API
+  if (_req.method === "OPTIONS" && parsedUrl.pathname?.startsWith("/api/auth")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // 3. Serve Public Landing Page
   if (parsedUrl.pathname === "/" && !query.token) {
     const indexPath = path.join(process.cwd(), "public", "index.html");

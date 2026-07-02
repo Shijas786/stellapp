@@ -1,12 +1,12 @@
 :root {
-    --bg-color: #020617;
+    --bg-color: #0c0d10;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --accent-1: #38bdf8;
-    --accent-2: #818cf8;
-    --accent-3: #c084fc;
-    --glass-bg: rgba(30, 41, 59, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --accent-1: #FFE600;
+    --accent-2: #FDE047;
+    --accent-3: #f59e0b;
+    --glass-bg: rgba(20, 20, 20, 0.6);
+    --glass-border: rgba(255, 230, 0, 0.15);
 }
 
 * {
@@ -29,7 +29,7 @@ body {
     position: absolute;
     filter: blur(100px);
     z-index: -1;
-    opacity: 0.5;
+    opacity: 0.3;
     border-radius: 50%;
     animation: float 20s infinite ease-in-out;
 }
@@ -117,27 +117,27 @@ body {
 }
 
 .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 230, 0, 0.1);
     transform: translateY(-2px);
 }
 
 .primary-btn {
     background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-    color: #fff;
+    color: #000;
     padding: 16px 32px;
     border-radius: 99px;
     text-decoration: none;
-    font-weight: 600;
+    font-weight: 800;
     font-size: 16px;
     border: none;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
+    box-shadow: 0 10px 20px rgba(255, 230, 0, 0.2);
 }
 
 .primary-btn:hover {
     transform: translateY(-3px);
-    box-shadow: 0 15px 25px rgba(56, 189, 248, 0.4);
+    box-shadow: 0 15px 25px rgba(255, 230, 0, 0.4);
 }
 
 .secondary-btn {
