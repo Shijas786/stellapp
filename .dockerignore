@@ -1,0 +1,9 @@
+node_modules
+.next
+dashboard/node_modules
+dashboard/.next
+dashboard/out
+dist
+scratch
+.wwebjs_auth
+/tmp
