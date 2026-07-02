@@ -10,7 +10,8 @@
     "build:dashboard": "cd dashboard && npm install --include=dev && npm run build && ls -la out",
     "build": "tsc && npm run build:dashboard",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "postinstall": "node -e \"const fs = require('fs'); const p = 'node_modules/@zkpassport/poseidon2/package.json'; if (fs.existsSync(p)) { const pkg = JSON.parse(fs.readFileSync(p, 'utf8')); delete pkg.type; fs.writeFileSync(p, JSON.stringify(pkg, null, 2)); }\""
   },
   "dependencies": {
     "@aztec/bb.js": "^0.87.0",
