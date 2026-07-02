@@ -135,10 +135,58 @@ http.createServer(async (_req, res) => {
   if (_req.method === "OPTIONS" && parsedUrl.pathname?.startsWith("/api/auth")) {
     res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
     res.setHeader("Vary", "Origin");
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // Temporary route to fix existing orphaned accounts
+  if (_req.method === "GET" && parsedUrl.pathname === "/api/auth/fix-accounts") {
+    try {
+      const allUsers = await prisma.user.findMany();
+      const orphans = allUsers.filter(u => u.chatId.length <= 15 && u.onboarded === false);
+      let fixed = 0;
+      let logs = [];
+      
+      for (const orphan of orphans) {
+        const rawNumber = orphan.chatId.replace("@c.us", "");
+        
+        const realAccount = allUsers.find(u => 
+          u.chatId !== orphan.chatId && 
+          u.chatId.endsWith(`${rawNumber}@c.us`) &&
+          u.onboarded === true
+        );
+        
+        if (realAccount) {
+          logs.push(`Found duplicate! Orphan: ${orphan.chatId}, Real: ${realAccount.chatId}`);
+          
+          await prisma.user.update({
+            where: { id: realAccount.id },
+            data: {
+              stellarPublic: orphan.stellarPublic,
+              stellarSecret: orphan.stellarSecret,
+              evmAddress: orphan.evmAddress,
+              evmPrivateKey: orphan.evmPrivateKey
+            }
+          });
+          
+          await prisma.user.delete({
+            where: { id: orphan.id }
+          });
+          
+          fixed++;
+          logs.push(`Fixed account for ${realAccount.chatId}!`);
+        }
+      }
+      
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, fixed, logs }));
+    } catch (err: any) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
