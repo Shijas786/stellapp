@@ -14,7 +14,7 @@ import type { CompiledCircuit } from "@noir-lang/noir_js";
 
 export type CircuitName = "register" | "withdraw" | "transfer";
 
-const circuitsDir = join(__dirname, "..", "..", "circuits");
+const circuitsDir = join(process.cwd(), "circuits");
 
 /** Synchronously load a compiled circuit by name (Node only). */
 export function loadCircuit(name: CircuitName): CompiledCircuit {
