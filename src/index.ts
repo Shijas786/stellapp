@@ -15,20 +15,18 @@ console.log("=========================================");
 console.log("Starting Stellar WhatsApp AI Bot...");
 console.log("=========================================");
 
-async function clearDatabase() {
+async function logConfidentialRegistries() {
   try {
-    console.log("⚠️ [DB Reset] CLEARING DATABASE FOR A FRESH START...");
-    await prisma.privacyDeposit.deleteMany();
-    await prisma.contact.deleteMany();
-    await prisma.sessionState.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.confidentialRegistry.deleteMany();
-    console.log("✅ [DB Reset] DATABASE SUCCESSFULLY CLEARED!");
+    const registries = await prisma.confidentialRegistry.findMany();
+    console.log("=========================================");
+    console.log("[ZK Diagnostic] Active Confidential registries in DB:");
+    console.log(JSON.stringify(registries, null, 2));
+    console.log("=========================================");
   } catch (err) {
-    console.error("[DB Reset] Failed to clear database:", err);
+    console.error("[ZK Diagnostic] Failed to log registries:", err);
   }
 }
-clearDatabase();
+logConfidentialRegistries();
 
 // 1. Initialize WhatsApp Adapter
 const bot = new WhatsAppBot();
