@@ -157,9 +157,9 @@ http.createServer(async (_req, res) => {
 
   // 3.5 Serve Next.js Dashboard
   if (parsedUrl.pathname?.startsWith("/dashboard")) {
-    let targetPath = parsedUrl.pathname;
-    if (targetPath === "/dashboard" || targetPath === "/dashboard/") {
-      targetPath = "/dashboard/index.html";
+    let targetPath = parsedUrl.pathname.replace(/^\/dashboard/, "");
+    if (targetPath === "" || targetPath === "/") {
+      targetPath = "/index.html";
     } else if (!path.extname(targetPath)) {
       targetPath += ".html";
     }
