@@ -1,0 +1,39 @@
+node_modules/
+dist/
+.env
+.wwebjs_auth/
+.wwebjs_cache/
+*.db
+*.db-journal
+scratch/
+target/
+*.wasm
+compiler_template/target/
+
+# Exception: pre-compiled privacy pool WASM must ship to production
+!contracts/privacy_pool/target/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/release/
+!contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm
+
+# Exception: ZK circuits must ship to production
+!circuits/
+!circuits/**
+
+# Exception: dynamic confidential token WASMs
+!contracts_wasm/
+!contracts_wasm/**
+
+
+# Higgsfield AI skills (local IDE tools, not part of this project)
+.agents/skills/higgsfield-generate/
+.agents/skills/higgsfield-marketplace-cards/
+.agents/skills/higgsfield-product-photoshoot/
+.agents/skills/higgsfield-soul-id/
+.agents/skills/higgsfield-websites/
+
+# Other local-only files
+.env.railway
+skills-lock.json
+finetuning_data.jsonl
+

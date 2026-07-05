@@ -1,0 +1,50 @@
+{
+  "name": "stellar-whatsapp-mcp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp AI Agent Bot with full MCP features on Stellar",
+  "main": "dist/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node scripts/setup-db-provider.js && tsx watch src/index.ts",
+    "start": "node scripts/setup-db-provider.js && npx prisma db push --accept-data-loss && tsx src/index.ts",
+    "build:dashboard": "cd dashboard && npm install --include=dev && npm run build && ls -la out",
+    "build": "tsc && npm run build:dashboard",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "db:clear": "node scripts/clear-db.js",
+    "postinstall": "node -e \"const fs = require('fs'); const p = 'node_modules/@zkpassport/poseidon2/package.json'; if (fs.existsSync(p)) { const pkg = JSON.parse(fs.readFileSync(p, 'utf8')); delete pkg.type; fs.writeFileSync(p, JSON.stringify(pkg, null, 2)); }\""
+  },
+  "dependencies": {
+    "@aztec/bb.js": "^0.87.0",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
+    "@noir-lang/noir_js": "^1.0.0-beta.9",
+    "@prisma/client": "^5.22.0",
+    "@stellar/stellar-sdk": "^16.0.1",
+    "@zkpassport/poseidon2": "^0.6.0",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "openai": "^4.85.4",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "snarkjs": "^0.7.6",
+    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#f935b500117e264c2b3abc25b63a280bd98182a7"
+  },
+  "devDependencies": {
+    "@types/circomlibjs": "^0.1.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.13.4",
+    "@types/qrcode": "^1.5.6",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/snarkjs": "^0.7.9",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
