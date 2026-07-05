@@ -11,3 +11,5 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-04T11:00:00] feat: implement message routing controller for whatsapp bot
 - [2026-07-04T15:30:00] feat: add openai agent handler module
 - [2026-07-05T09:40:00] feat: build base system prompt templates for AI context
+- [2026-07-05T13:10:00] feat: implement user onboarding flow and wallet creation
+- [2026-07-05T16:50:00] feat: integrate friendbot testnet account funding
