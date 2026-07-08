@@ -17,3 +17,5 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-06T14:40:00] feat: build send_stellar payments tool for XLM and USDC
 - [2026-07-07T11:15:00] feat: implement dynamic USDC trustline creation hook
 - [2026-07-07T15:55:00] feat: build resolve_recipient tool for username/phone matching
+- [2026-07-08T09:30:00] feat: add live market price queries via coingecko
+- [2026-07-08T13:45:00] feat: build swap_stellar tool using dynamic paths
