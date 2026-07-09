@@ -19,3 +19,5 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-07T15:55:00] feat: build resolve_recipient tool for username/phone matching
 - [2026-07-08T09:30:00] feat: add live market price queries via coingecko
 - [2026-07-08T13:45:00] feat: build swap_stellar tool using dynamic paths
+- [2026-07-08T17:00:00] feat: design and implement recurring payment worker jobs
+- [2026-07-09T10:05:00] feat: implement recurring swaps DCA scheduler
