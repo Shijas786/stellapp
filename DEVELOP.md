@@ -28,3 +28,6 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-11T14:25:00] feat: add escrow contract initialization and release triggers
 - [2026-07-11T16:50:00] feat: implement ledger watcher event stream listener
 - [2026-07-12T09:40:00] feat: add ledger watcher notification dispatcher for incoming payments
+- [2026-07-12T13:15:00] feat: compile privacy pool zk SNARK constraints circom
+- [2026-07-12T15:30:00] feat: build zk witness generator using wasm
+- [2026-07-12T17:45:00] feat: implement zk witness calculator wrapper
