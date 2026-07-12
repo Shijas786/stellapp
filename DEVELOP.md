@@ -26,3 +26,5 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-10T15:45:00] feat: integrate wasm compiler service for custom contract builds
 - [2026-07-11T10:10:00] feat: implement dynamic contract upload and instantiation on-chain
 - [2026-07-11T14:25:00] feat: add escrow contract initialization and release triggers
+- [2026-07-11T16:50:00] feat: implement ledger watcher event stream listener
+- [2026-07-12T09:40:00] feat: add ledger watcher notification dispatcher for incoming payments
