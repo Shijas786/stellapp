@@ -31,3 +31,6 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-12T13:15:00] feat: compile privacy pool zk SNARK constraints circom
 - [2026-07-12T15:30:00] feat: build zk witness generator using wasm
 - [2026-07-12T17:45:00] feat: implement zk witness calculator wrapper
+- [2026-07-13T10:00:00] feat: design soroban privacy pool verifier contract
+- [2026-07-13T12:30:00] feat: implement zk proof generation inside background worker threads
+- [2026-07-13T14:50:00] feat: integrate privacy pool deposit and withdraw tools
