@@ -51,3 +51,5 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-14T18:15:00] feat: make onboarding welcome message network-adaptive
 - [2026-07-14T18:30:00] feat: add switch_network tool to AI agent context
 - [2026-07-14T18:45:00] fix: automatically trigger testnet funding on balance check
+- [2026-07-14T18:50:00] chore: cleanup scratch files and finalize codebase
+- [2026-07-14T18:55:00] release: production build v1.0.0
