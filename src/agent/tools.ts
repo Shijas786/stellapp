@@ -1,4 +1,5 @@
 import { encrypt, decrypt } from "../services/encryption";
+import { Keypair } from "@stellar/stellar-sdk";
 import * as stellar from "../services/stellar";
 import { getSinglePrice, getLivePrices, formatPriceMessage } from "../services/price";
 import { config } from "../services/config";
@@ -2433,6 +2434,29 @@ ${rustCode}
       }
 
       return `No active job found with ID: \`${jobId}\`.`;
+    }
+
+    case "export_wallet": {
+      const pending = await getPendingAction(chatId);
+      const isConfirmed = await isLatestMessageConfirmation(chatId);
+      const argsMatch = pending && pending.name === "export_wallet";
+
+      if ((!pending || !argsMatch) && !isConfirmed) {
+        await savePendingAction(chatId, "export_wallet", {});
+        return `CONFIRMATION_REQUIRED: You must warn the user about the security risk of displaying their private key in chat, and ask them to explicitly confirm by replying 'yes' or 'confirm' to view it.`;
+      }
+
+      await clearPendingAction(chatId);
+
+      const secretKey = decrypt(user.stellarSecret);
+      const publicKey = Keypair.fromSecret(secretKey).publicKey();
+
+      return {
+        success: true,
+        publicKey,
+        secretKey,
+        message: `🔑 *Wallet Export Details*\n\n⚠️ *WARNING: NEVER share your Secret Key with anyone. Anyone who has this key can steal all your funds.*\n\n*This message contains highly sensitive keys and will be automatically edited/redacted in 5 minutes for your safety. Please copy and save your keys securely now!*\n\n*Public Address:* \`${publicKey}\`\n*Secret Key:* \`${secretKey}\``
+      };
     }
 
     default:

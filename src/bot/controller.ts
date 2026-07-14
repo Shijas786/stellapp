@@ -14,7 +14,7 @@ export async function handleIncomingMessage(
   text: string,
   contactName: string = "",
   phoneNumber: string = ""
-): Promise<{ text: string; imagePath?: string }> {
+): Promise<{ text: string; imagePath?: string; redactAfterMs?: number }> {
   // 0. Intercept network switches first
   const cleanTextLower = text.trim().toLowerCase();
   if (cleanTextLower === "switch to mainnet" || cleanTextLower === "switch to testnet") {
@@ -286,7 +286,12 @@ export async function handleIncomingMessage(
         stellarPublic: user.stellarPublic,
         stellarSecret: user.stellarSecret,
       }, true); // Always use primary agent model (gpt-4o) for high accuracy
-      return { text: aiResponse };
+      
+      const isExportMsg = aiResponse.includes("🔑 *Wallet Export Details*") || aiResponse.includes("*Secret Key:*");
+      return { 
+        text: aiResponse,
+        redactAfterMs: isExportMsg ? 300000 : undefined
+      };
     } catch (error: any) {
       console.error(`[Controller] Agent loop error for user ${chatId}:`, error.message);
       throw error;

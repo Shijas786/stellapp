@@ -844,5 +844,12 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
         required: ["jobId"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "export_wallet",
+      description: "Decrypt and export the user's Stellar secret key (private key) and public key. Call when the user explicitly asks 'export my wallet', 'show my private key', 'give me my recovery seed', 'how do I back up my wallet', or similar."
+    }
   }
 ];

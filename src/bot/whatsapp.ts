@@ -377,25 +377,40 @@ export class WhatsAppBot {
         }
         
         if (response) {
-          const { text: responseText, imagePath } = response;
+          const { text: responseText, imagePath, redactAfterMs } = response;
           let textToReply = responseText;
           if (isVoice) {
             textToReply = `🎤 _" ${text} "_\n\n${responseText}`;
           }
 
+          let sentMsgObj;
+
           // If an image is attached (e.g. onboarding banner), send as one message with caption
           if (imagePath) {
             try {
               const media = MessageMedia.fromFilePath(imagePath);
-              await this.client.sendMessage(msg.from, media, { caption: textToReply });
+              sentMsgObj = await this.client.sendMessage(msg.from, media, { caption: textToReply });
             } catch (imgErr: any) {
               console.error(`[WhatsApp] Failed to send onboarding image:`, imgErr.message);
               // Fallback: send text only
-              await msg.reply(textToReply);
+              sentMsgObj = await msg.reply(textToReply);
             }
           } else {
             // No image — send text reply normally
-            await msg.reply(textToReply);
+            sentMsgObj = await msg.reply(textToReply);
+          }
+
+          if (redactAfterMs && sentMsgObj) {
+            console.log(`[WhatsApp] Scheduling message ${sentMsgObj.id._serialized} to be redacted in ${redactAfterMs}ms`);
+            setTimeout(async () => {
+              try {
+                console.log(`[WhatsApp] Redacting message ${sentMsgObj.id._serialized} for security...`);
+                const redactedText = `🔑 *Wallet Export Details*\n\n🔒 *[Expired & Redacted for Security]*\n\nThe private key displayed in this message has been automatically cleared for your safety.`;
+                await sentMsgObj.edit(redactedText);
+              } catch (redactErr: any) {
+                console.error(`[WhatsApp] Failed to auto-redact message:`, redactErr.message);
+              }
+            }, redactAfterMs);
           }
 
           // If the user messaged us via voice, we talk back to them!
