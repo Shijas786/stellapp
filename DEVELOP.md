@@ -34,3 +34,6 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-13T10:00:00] feat: design soroban privacy pool verifier contract
 - [2026-07-13T12:30:00] feat: implement zk proof generation inside background worker threads
 - [2026-07-13T14:50:00] feat: integrate privacy pool deposit and withdraw tools
+- [2026-07-13T16:40:00] feat: implement confidential token registry tracking
+- [2026-07-13T18:10:00] feat: design confidential transfer proof constraints
+- [2026-07-14T08:30:00] feat: implement confidential transfer and registration tools
