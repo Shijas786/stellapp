@@ -47,7 +47,7 @@ const BLS12_381_BASE_FIELD_MODULUS = BigInt(
   "1eabfffeb153ffffb9feffffffffaaab"
 );
 
-export const USDC_ASSET = new Proxy({} as Asset, {
+export const USDC_ASSET = new Proxy(new Asset("USDC", "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"), {
   get(target, prop, receiver) {
     const asset = new Asset(USDC_CODE, config.stellarUsdcIssuer);
     const value = Reflect.get(asset, prop, receiver);

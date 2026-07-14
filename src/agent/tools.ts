@@ -1756,10 +1756,13 @@ ${rustCode}
       
       // Auto-lookup logic if no valid contractId is specified
       if (!poolContractId || poolContractId.startsWith("C...") || poolContractId.length < 10) {
-        // Fallback to official default USDC pool contract
+        // Fallback to official default pool contracts
         if (assetCode === "USDC") {
           poolContractId = "CBNWI5VVLB5ISMXKYS2HBARIJAVR35ACZMQM6TQMMTU3AGMVRV5ZC7QL";
           console.log(`[ZK Pool] Routed deposit to official default USDC pool: ${poolContractId}`);
+        } else if (assetCode === "XLM") {
+          poolContractId = "CAGPVMYFTDPLUOMEGCQYC4AMN5OGWN4DZ46S65EHQEUVS5EEHVWXMP6V";
+          console.log(`[ZK Pool] Routed deposit to official default XLM pool: ${poolContractId}`);
         } else {
           // A. Check session state
           try {
