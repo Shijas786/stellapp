@@ -47,3 +47,7 @@ This log documents the developmental sequence of the Stellapp WhatsApp platform.
 - [2026-07-14T17:00:00] feat: wrap background worker routines in target user network context
 - [2026-07-14T17:20:00] feat: add switch command interception to controller
 - [2026-07-14T17:40:00] feat: add WIPE_WHATSAPP_SESSION startup hook for session resets
+- [2026-07-14T18:00:00] feat: make admin dashboard multi-network aware
+- [2026-07-14T18:15:00] feat: make onboarding welcome message network-adaptive
+- [2026-07-14T18:30:00] feat: add switch_network tool to AI agent context
+- [2026-07-14T18:45:00] fix: automatically trigger testnet funding on balance check
