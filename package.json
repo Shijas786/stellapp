@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "node scripts/setup-db-provider.js && tsx watch src/index.ts",
     "start": "node scripts/setup-db-provider.js && npx prisma db push && tsx src/index.ts",
-    "build:dashboard": "cd dashboard && npm install --include=dev && npm run build && ls -la out",
-    "build": "tsc && npm run build:dashboard",
+    "build": "tsc",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:clear": "node scripts/clear-db.js",
