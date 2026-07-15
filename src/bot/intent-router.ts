@@ -1,5 +1,5 @@
 import * as stellar from "../services/stellar";
-import { decrypt } from "../services/encryption";
+import { decryptForUserWithMigration } from "../services/encryption";
 import { prisma } from "../services/db";
 import { config } from "../services/config";
 import { sendNotification } from "../agent/tools";
@@ -394,7 +394,7 @@ async function routeIntentInternal(
     if (pending.name === "send_stellar") {
       try {
         const { recipient, resolvedAddr, amount, asset } = pending.args;
-        const stellarSecret = decrypt(user.stellarSecret);
+        const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
         const isUSDC = asset === "USDC";
 
         // Check activation and fund if needed (Testnet only)
@@ -405,7 +405,7 @@ async function routeIntentInternal(
           });
           if (resolvedUser) {
             await stellar.fundStellarAccount(resolvedAddr);
-            await stellar.ensureUSDCTrustline(decrypt(resolvedUser.stellarSecret));
+            await stellar.ensureUSDCTrustline(decryptForUserWithMigration(resolvedUser.stellarSecret, resolvedUser.id).plaintext);
           }
         }
 

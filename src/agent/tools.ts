@@ -1,4 +1,4 @@
-import { encrypt, decrypt } from "../services/encryption";
+import { encrypt, decrypt, encryptForUser, decryptForUserWithMigration } from "../services/encryption";
 import { Keypair } from "@stellar/stellar-sdk";
 import * as stellar from "../services/stellar";
 import { getSinglePrice, getLivePrices, formatPriceMessage } from "../services/price";
@@ -667,7 +667,7 @@ export async function executeTool(
         const funded = await stellar.fundStellarAccount(user.stellarPublic);
         if (funded) {
           try {
-            await stellar.ensureUSDCTrustline(decrypt(user.stellarSecret));
+            await stellar.ensureUSDCTrustline(decryptForUserWithMigration(user.stellarSecret, user.id).plaintext);
           } catch (e: any) {
             console.error("[Tools] Auto-funding USDC trustline in balance check failed:", e.message);
           }
@@ -706,7 +706,7 @@ export async function executeTool(
         const funded = await stellar.fundStellarAccount(user.stellarPublic);
         if (funded) {
           try {
-            await stellar.ensureUSDCTrustline(decrypt(user.stellarSecret));
+            await stellar.ensureUSDCTrustline(decryptForUserWithMigration(user.stellarSecret, user.id).plaintext);
             activated = true;
           } catch (e: any) {
             console.error("[Tools] Auto-funding USDC trustline failed:", e.message);
@@ -724,7 +724,7 @@ export async function executeTool(
       }
 
       // Account has XLM — ensure USDC trustline is established
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       let trustlineSetup = false;
       try {
         await stellar.ensureUSDCTrustline(stellarSecret);
@@ -902,7 +902,7 @@ export async function executeTool(
         throw new Error(`SECURITY LIMIT: Transaction amount of ${args.amount} ${args.asset} exceeds the single-transaction spend cap of ${limit} ${args.asset}. Please split it into smaller amounts.`);
       }
 
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       // Strip leading '@' in case it's a mention or username tag
       let recipient = args.recipient.trim().replace(/^@/, "");
 
@@ -1063,10 +1063,10 @@ export async function executeTool(
             console.log(`[Tools] Funding pre-created account on testnet: ${resolvedUser.stellarPublic}`);
             await stellar.fundStellarAccount(resolvedUser.stellarPublic);
             console.log(`[Tools] Establishing USDC trustline for pre-created account...`);
-            await stellar.ensureUSDCTrustline(decrypt(resolvedUser.stellarSecret));
+            await stellar.ensureUSDCTrustline(decryptForUserWithMigration(resolvedUser.stellarSecret, resolvedUser.id).plaintext);
           } else {
             isGhostOnboardedOnMainnet = true;
-            ghostSecret = decrypt(resolvedUser.stellarSecret);
+            ghostSecret = decryptForUserWithMigration(resolvedUser.stellarSecret, resolvedUser.id).plaintext;
           }
         }
       }
@@ -1150,7 +1150,7 @@ export async function executeTool(
       }
 
       await clearPendingAction(chatId);
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const txHash = await stellar.swapTokens(stellarSecret, args.amount, args.direction);
 
       return {
@@ -1383,7 +1383,7 @@ export async function executeTool(
 
     case "deploy_escrow_contract": {
       await sendNotification(chatId, "⏳ *Deploying Escrow Contract...*\n\nThis involves compiling the Rust smart contract to WASM and deploying it to the Stellar network. It usually takes 30-45 seconds. Please wait!");
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const { contractId, txHash } = await stellar.deployEscrowContract(
         stellarSecret,
         args.recipientAddress,
@@ -1414,7 +1414,7 @@ export async function executeTool(
       }
 
       await clearPendingAction(chatId);
-      const relSecret = decrypt(user.stellarSecret);
+      const relSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const relTxHash = await stellar.releaseEscrowContract(relSecret, args.contractId);
 
       return {
@@ -1439,7 +1439,7 @@ export async function executeTool(
       }
 
       await clearPendingAction(chatId);
-      const refSecret = decrypt(user.stellarSecret);
+      const refSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const refTxHash = await stellar.refundEscrowContract(refSecret, args.contractId);
 
       return {
@@ -1473,7 +1473,7 @@ export async function executeTool(
       await clearPendingAction(chatId);
 
       const statusMsgId = await sendNotification(chatId, "⏳ *[1/3] Generating Rust contract...*\n\nGenerating your custom Soroban Rust contract code using the Responses API + Stellar Vector Store. Please wait!");
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const contractType: string = (args.contractType || "custom").toLowerCase();
 
       let rustCode: string;
@@ -1721,7 +1721,7 @@ ${rustCode}
     case "deploy_privacy_pool": {
       const assetCode = (args.assetCode || "USDC").toUpperCase();
       await sendNotification(chatId, `⏳ *Deploying ZK Privacy Pool for ${assetCode}...*\n\nThis involves deploying the Zero-Knowledge verifier and the privacy pool to the Stellar network. It usually takes 30-45 seconds. Please wait!`);
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const { contractId, txHash } = await stellar.deployPrivacyPool(stellarSecret, assetCode);
 
       // Save contract ID to session state for automatic fallback lookup
@@ -1750,7 +1750,7 @@ ${rustCode}
     }
 
     case "deposit_private_pool": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.assetCode || "USDC").toUpperCase();
       
       let poolContractId = (args.contractId || "").trim();
@@ -2050,7 +2050,7 @@ ${rustCode}
 
       // Withdraw using resolved recipient
       // DECRYPT KEY ONLY AT THE SIGNING MOMENT to minimize memory lifetime
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const txHash = await stellar.withdrawFromPrivacyPool(
         stellarSecret,
         contractId,
@@ -2096,7 +2096,7 @@ ${rustCode}
     }
 
     case "confidential_register": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.asset || "XLM").toUpperCase();
       await sendNotification(chatId, `⏳ *Generating registration ZK proof for ${assetCode}...*\n\nThis involves deriving your confidential spending/viewing keys and submitting a ZK registration proof to the Stellar contract. It takes 15-20 seconds.`);
       const txHash = await confidentialToken.registerConfidential(stellarSecret, assetCode);
@@ -2109,7 +2109,7 @@ ${rustCode}
     }
 
     case "confidential_register_all": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
 
       // 1. Detect which assets the user actually holds (non-zero balance)
       const balances = await stellar.getBalances(user.stellarPublic);
@@ -2155,7 +2155,7 @@ ${rustCode}
 
 
     case "confidential_deposit": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const amountStr = args.amount;
       if (isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
         throw new Error(`Invalid deposit amount: "${amountStr}". Please provide a positive number.`);
@@ -2172,7 +2172,7 @@ ${rustCode}
     }
 
     case "confidential_merge": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.asset || "XLM").toUpperCase();
       await sendNotification(chatId, `⏳ *Merging receiving balance into spendable for ${assetCode}...*`);
       const txHash = await confidentialToken.mergeConfidential(stellarSecret, assetCode);
@@ -2185,7 +2185,7 @@ ${rustCode}
     }
 
     case "confidential_balance": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.asset || "XLM").toUpperCase();
       const balances = await confidentialToken.getConfidentialBalances(stellarSecret, assetCode);
 
@@ -2217,7 +2217,7 @@ ${rustCode}
 
 
     case "confidential_transfer": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const amountStr = args.amount;
       if (isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
         throw new Error(`Invalid transfer amount: "${amountStr}". Please provide a positive number.`);
@@ -2333,7 +2333,7 @@ ${rustCode}
     }
 
     case "confidential_withdraw": {
-      const stellarSecret = decrypt(user.stellarSecret);
+      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const amountStr = args.amount;
       if (isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
         throw new Error(`Invalid withdrawal amount: "${amountStr}". Please provide a positive number.`);
@@ -2448,7 +2448,7 @@ ${rustCode}
 
       await clearPendingAction(chatId);
 
-      const secretKey = decrypt(user.stellarSecret);
+      const secretKey = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const publicKey = Keypair.fromSecret(secretKey).publicKey();
 
       return {

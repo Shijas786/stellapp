@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { networkStorage } from "./network-context";
 import { swapTokens, sendStellarToken, getCurrentPriceOfXlmInUsdc, getBalances } from "./stellar";
 import { getSinglePrice } from "./price";
-import { decrypt } from "./encryption";
+import { decryptForUserWithMigration } from "./encryption";
 import fs from "fs";
 import path from "path";
 
@@ -97,7 +97,7 @@ async function processSwapJobs() {
           continue;
         }
 
-        const secretKey = decrypt(user.stellarSecret);
+        const secretKey = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
         const direction = job.fromAsset === "USDC" ? "USDC_TO_XLM" : "XLM_TO_USDC";
         
         // Trigger live typing presence indicator
@@ -238,7 +238,7 @@ async function processTransferJobs() {
           continue;
         }
 
-        const secretKey = decrypt(user.stellarSecret);
+        const secretKey = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
         const isUSDC = job.assetCode === "USDC";
 
         // Trigger live typing presence indicator
@@ -381,7 +381,7 @@ async function processLimitOrders() {
             continue;
           }
 
-          const secretKey = decrypt(user.stellarSecret);
+          const secretKey = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
           const direction = order.fromAsset === "USDC" ? "USDC_TO_XLM" : "XLM_TO_USDC";
 
           console.log(`[Recurring Worker] Price target met! Executing Limit Order ${order.id} (Current Price: ${currentPrice.toFixed(4)} USDC/XLM)...`);

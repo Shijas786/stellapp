@@ -3,6 +3,7 @@ import http from "http";
 import url from "url";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import QRCode from "qrcode";
 import { WhatsAppBot } from "./bot/whatsapp";
 import { setNotificationSender, setDocumentSender, setNotificationEditor } from "./agent/tools";
@@ -77,7 +78,9 @@ const PORT = process.env.PORT || 3000;
 http.createServer(async (_req, res) => {
   const parsedUrl = url.parse(_req.url || "", true);
   const query = parsedUrl.query;
-  const token = process.env.ENCRYPTION_KEY || "";
+  // ADMIN_API_SECRET is a dedicated secret for admin routes — completely separate
+  // from ENCRYPTION_KEY (the wallet-decryption master key).
+  const ADMIN_SECRET = process.env.ADMIN_API_SECRET || "";
   
   // 1. Stellar Federation TOML Endpoint
   if (parsedUrl.pathname === "/.well-known/stellar.toml") {
@@ -123,8 +126,33 @@ http.createServer(async (_req, res) => {
 
   // Admin-only route to fix existing orphaned accounts (requires secret token)
   if (_req.method === "GET" && parsedUrl.pathname === "/api/auth/fix-accounts") {
-    // Require the ENCRYPTION_KEY as a query param for security
-    if (query.secret !== token) {
+    // Require ADMIN_API_SECRET — read from Authorization header (preferred) or
+    // query param (legacy, kept for backward-compat but logs a deprecation warning).
+    if (!ADMIN_SECRET) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "ADMIN_API_SECRET not configured on server" }));
+      return;
+    }
+
+    let providedSecret: string | undefined;
+    const authHeader = _req.headers["authorization"];
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      providedSecret = authHeader.slice(7);
+    } else if (typeof query.secret === "string") {
+      console.warn("[Admin] Secret provided via query param — prefer Authorization: Bearer <secret> to avoid log exposure");
+      providedSecret = query.secret;
+    }
+
+    // Constant-time comparison to prevent timing oracle attacks
+    const secretsMatch =
+      providedSecret !== undefined &&
+      providedSecret.length === ADMIN_SECRET.length &&
+      crypto.timingSafeEqual(
+        Buffer.from(providedSecret, "utf8"),
+        Buffer.from(ADMIN_SECRET, "utf8")
+      );
+
+    if (!secretsMatch) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Forbidden" }));
       return;
@@ -248,7 +276,7 @@ http.createServer(async (_req, res) => {
   }
 
   // Require token verification to access the dashboard/setup page
-  if (query.token !== token) {
+  if (query.token !== ADMIN_SECRET) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`
       <html>
@@ -265,8 +293,8 @@ http.createServer(async (_req, res) => {
         <body>
           <div class="card">
             <h2>🔒 Access Denied</h2>
-            <p>To link this bot, please include your secure ENCRYPTION_KEY as a token parameter in the URL:</p>
-            <code>?token=YOUR_ENCRYPTION_KEY</code>
+            <p>To link this bot, please include your secure ADMIN_API_SECRET as a token parameter in the URL:</p>
+            <code>?token=YOUR_ADMIN_API_SECRET</code>
           </div>
         </body>
       </html>
@@ -305,7 +333,7 @@ http.createServer(async (_req, res) => {
                 • Deleted Session States: <b>${deletedSessions.count}</b><br/>
                 • Deleted Chat Histories: <b>${deletedChats.count}</b>
               </div>
-              <a href="?token=${token}" class="btn">Back to Dashboard</a>
+              <a href="?token=${ADMIN_SECRET}" class="btn">Back to Dashboard</a>
             </div>
           </body>
         </html>
@@ -1047,8 +1075,8 @@ http.createServer(async (_req, res) => {
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
                   <div style="display: flex; gap: 10px;">
-                    <a href="?token=${token}&action=reset" class="btn-action btn-danger" style="flex: 1; text-align: center;" onclick="return confirm('Are you sure you want to disconnect the active WhatsApp session cache? You will need to scan a new QR code.')">♻️ Reset JID Cache</a>
-                    <a href="?token=${token}&action=clear-db" class="btn-action btn-warning" style="flex: 1; text-align: center;" onclick="return confirm('⚠️ WARNING: This will permanently wipe all users, contacts, and transactions. Continue?')">🗑️ Wipe Database</a>
+                    <a href="?token=${ADMIN_SECRET}&action=reset" class="btn-action btn-danger" style="flex: 1; text-align: center;" onclick="return confirm('Are you sure you want to disconnect the active WhatsApp session cache? You will need to scan a new QR code.')">♻️ Reset JID Cache</a>
+                    <a href="?token=${ADMIN_SECRET}&action=clear-db" class="btn-action btn-warning" style="flex: 1; text-align: center;" onclick="return confirm('⚠️ WARNING: This will permanently wipe all users, contacts, and transactions. Continue?')">🗑️ Wipe Database</a>
                   </div>
                 </div>
               </div>
@@ -1161,11 +1189,11 @@ http.createServer(async (_req, res) => {
                     <p style="color:#34d399; font-size:14px; margin:0;">Enter this code on your phone:</p>
                     <div class="code-display">${pairingCode}</div>
                     <p style="color:#64748b; font-size:12px; margin:0;">Code expires in 3 minutes.</p>
-                    <button style="margin-top:15px; background:#475569;" onclick="window.location.search = '?token=${token}'">Reset / Go Back</button>
+                    <button style="margin-top:15px; background:#475569;" onclick="window.location.search = '?token=${ADMIN_SECRET}'">Reset / Go Back</button>
                   </div>
                 ` : `
                   <form method="GET" style="width: 100%;">
-                    <input type="hidden" name="token" value="${token}" />
+                    <input type="hidden" name="token" value="${ADMIN_SECRET}" />
                     <label style="display:block; font-size:13px; color:#94a3b8; margin-bottom:5px;">Phone Number (International Format)</label>
                     <input type="text" name="phone" placeholder="e.g. 919876543210" required />
                     <button type="submit">Generate Pairing Code</button>
@@ -1174,7 +1202,7 @@ http.createServer(async (_req, res) => {
               </div>
             </div>
             <div style="text-align:center; margin-top:30px;">
-              <a href="?token=${token}&action=reset" style="color:#64748b; font-size:13px; text-decoration:none; border: 1px dashed #475569; padding: 6px 12px; border-radius: 6px; display: inline-block; transition: color 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">♻️ Stale QR or Sync Hung? Reset and Generate Fresh QR</a>
+              <a href="?token=${ADMIN_SECRET}&action=reset" style="color:#64748b; font-size:13px; text-decoration:none; border: 1px dashed #475569; padding: 6px 12px; border-radius: 6px; display: inline-block; transition: color 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">♻️ Stale QR or Sync Hung? Reset and Generate Fresh QR</a>
             </div>
           </div>
 

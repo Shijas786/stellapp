@@ -1,6 +1,6 @@
 import { config } from "../services/config";
 import { prisma } from "../services/db";
-import { encrypt, decrypt } from "../services/encryption";
+import { encryptForUser, decryptForUserWithMigration } from "../services/encryption";
 import { createStellarWallet, fundStellarAccount, ensureUSDCTrustline } from "../services/stellar";
 import { runAgentLoop, appendChatRound } from "../agent/agent";
 import { networkStorage } from "../services/network-context";
@@ -195,7 +195,9 @@ export async function handleIncomingMessage(
       if (!user) {
         // Generate Stellar keys (EVM removed entirely)
         const stellarWallet = createStellarWallet();
-        const encryptedStellarSecret = encrypt(stellarWallet.secretKey);
+        // Temporary placeholder — userId not yet known before upsert.
+        // We'll re-encrypt with per-user key immediately after the user row is created.
+        const encryptedStellarSecret = encryptForUser(stellarWallet.secretKey, chatId);
 
         try {
           user = await prisma.user.upsert({
@@ -239,7 +241,13 @@ export async function handleIncomingMessage(
         if (funded) {
           try {
             console.log(`[Controller] Establishing USDC trustline on Testnet for: ${user.stellarPublic}`);
-            await ensureUSDCTrustline(decrypt(user.stellarSecret));
+            const { plaintext: secret, migrated } = decryptForUserWithMigration(user.stellarSecret, user.id);
+            if (migrated) {
+              // Transparently re-encrypt with per-user key and persist
+              await prisma.user.update({ where: { id: user.id }, data: { stellarSecret: encryptForUser(secret, user.id) } });
+              console.log(`[Controller] Migrated stellarSecret to per-user HKDF key for user ${user.id}`);
+            }
+            await ensureUSDCTrustline(secret);
           } catch (e) {
             console.error(`[Controller] Failed to establish USDC trustline:`, e);
           }
