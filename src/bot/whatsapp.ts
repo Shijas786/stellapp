@@ -222,6 +222,24 @@ export class WhatsAppBot {
           return;
         }
 
+        const originalSenderId = msg.author || msg.from;
+        let senderId = originalSenderId;
+        let contactNumber = "";
+
+        if (originalSenderId.endsWith("@lid")) {
+          try {
+            console.log(`[WhatsApp] Resolving LID ${originalSenderId} mapping...`);
+            const mapping = await this.client.getContactLidAndPhone([originalSenderId]);
+            if (mapping && mapping[0] && mapping[0].pn) {
+              senderId = mapping[0].pn;
+              contactNumber = mapping[0].pn.split("@")[0];
+              console.log(`[WhatsApp] Successfully mapped LID ${originalSenderId} to canonical JID: ${senderId} (PN: ${contactNumber})`);
+            }
+          } catch (lidErr: any) {
+            console.error("[WhatsApp] Failed to map LID to PN:", lidErr.message);
+          }
+        }
+
         let text = msg.body;
         let isVoice = false;
 
@@ -238,9 +256,9 @@ export class WhatsAppBot {
 
           if (vCards.length > 0) {
             let savedCount = 0;
-            // Fetch user
+            // Fetch user using mapped JID to unify database profiles under canonical JIDs
             const user = await prisma.user.findUnique({
-              where: { chatId: msg.from }
+              where: { chatId: senderId }
             });
             
             if (!user) {
@@ -293,10 +311,8 @@ export class WhatsAppBot {
                 savedCount++;
                 await msg.reply(`✅ Saved *${name}* (+${phoneNumber}) to your address book!`);
                 
-                // Inject context into the AI history so the next message
-                // (e.g. "send him 10 USDC") knows who was just saved.
                 await injectContextMessage(
-                  msg.author || msg.from,
+                  senderId,
                   `I just saved a new contact: *${name}* with phone number +${phoneNumber}. If the user refers to "him", "her", or "them" in their next message, they almost certainly mean ${name} (+${phoneNumber}).`
                 );
               }
@@ -305,14 +321,145 @@ export class WhatsAppBot {
           }
         }
 
-        // Check if message is a voice note or audio file
         if (msg.type === "ptt" || msg.type === "audio") {
           if (msg.hasMedia) {
             isVoice = true;
             console.log(`[WhatsApp] Received voice message. Downloading...`);
-            const media = await msg.downloadMedia();
+            
+            // FIX: WhatsApp Web's latest version minified `_serialized` to `$1` (or similar).
+            // `downloadMedia` relies on `this.id._serialized`, which is undefined, causing "r: r" errors.
+            // We reconstruct it manually if it's missing.
+            if (!msg.id._serialized) {
+              const fromMe = msg.id.fromMe ? "true" : "false";
+              const remote = msg.id.remote || msg.from;
+              const id = msg.id.id;
+              msg.id._serialized = `${fromMe}_${remote}_${id}`;
+              console.log(`[WhatsApp Fix] Reconstructed missing _serialized ID: ${msg.id._serialized}`);
+            }
+
+            let media: any = null;
+            let downloadError: any = null;
+            
+            // Implement retry logic with exponential backoff for media download
+            const maxRetries = 2;
+            const baseDelay = 1500;
+            
+            for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+              try {
+                media = await msg.downloadMedia();
+                if (media) {
+                  console.log(`[WhatsApp] Successfully downloaded voice message on attempt ${attempt}`);
+                  break;
+                }
+                console.warn(`[WhatsApp] Attempt ${attempt}: downloadMedia returned undefined`);
+              } catch (err: any) {
+                downloadError = err;
+                console.warn(`[WhatsApp] Attempt ${attempt}: downloadMedia failed:`, err.stack || err);
+                if (this.client.pupPage) {
+                  try {
+                    // Log the msg object properties from whatsapp-web.js
+                    console.log(`[WhatsApp Diagnostic] msg object properties:`, JSON.stringify({
+                      id: msg.id,
+                      isEphemeral: msg.isEphemeral,
+                      isStatus: msg.isStatus,
+                      isForwarded: msg.isForwarded,
+                      broadcast: msg.broadcast,
+                      from: msg.from,
+                      to: msg.to,
+                      author: msg.author,
+                      deviceType: msg.deviceType,
+                      type: msg.type,
+                      hasMedia: msg.hasMedia
+                    }, null, 2));
+
+                    const info = await this.client.pupPage.evaluate((msgId, lid, trueJid) => {
+                      const Store = (window as any).require('WAWebCollections');
+                      if (!Store || !Store.Msg) return { error: "Store.Msg not found" };
+
+                      const searchResult: any = { requestedId: msgId, lid, trueJid };
+                      let m = Store.Msg.get(msgId);
+                      
+                      if (m) {
+                        searchResult.found = true;
+                        searchResult.method = "exact_id";
+                      } else {
+                        // Try replacing LID with trueJid in msgId if they differ
+                        if (lid && trueJid && lid !== trueJid && msgId.includes(lid)) {
+                          const altId = msgId.replace(lid, trueJid);
+                          m = Store.Msg.get(altId);
+                          if (m) {
+                            searchResult.found = true;
+                            searchResult.method = "replaced_lid";
+                            searchResult.altId = altId;
+                          }
+                        }
+
+                        // Still not found? Search by hash/suffix (last part of the ID)
+                        if (!m) {
+                          const parts = msgId.split("_");
+                          const hash = parts[parts.length - 1];
+                          if (hash && hash.length > 10) { // ensures it's a real hash
+                            const allMsgs = Store.Msg.models || [];
+                            for (let i = 0; i < allMsgs.length; i++) {
+                              const model = allMsgs[i];
+                              if (model.id && model.id._serialized && model.id._serialized.endsWith(hash)) {
+                                m = model;
+                                searchResult.found = true;
+                                searchResult.method = "suffix_match";
+                                searchResult.foundId = model.id._serialized;
+                                break;
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                      if (!m) {
+                        searchResult.error = "Message completely not found in Store.Msg by any method";
+                        return searchResult;
+                      }
+                      
+                      searchResult.messageDetails = {
+                        id: m.id._serialized,
+                        type: m.type,
+                        mediaStage: m.mediaData ? m.mediaData.mediaStage : "no mediaData",
+                        hasDirectPath: !!m.directPath,
+                        hasEncFilehash: !!m.encFilehash,
+                        hasFilehash: !!m.filehash,
+                        hasMediaKey: !!m.mediaKey,
+                        mimetype: m.mimetype,
+                        size: m.size,
+                        isEphemeral: m.isEphemeral,
+                        isBroadcast: m.isBroadcast,
+                        isChannel: m.isChannel,
+                        isGroupMsg: m.isGroupMsg,
+                        author: m.author ? m.author._serialized : null,
+                        from: m.from ? m.from._serialized : null
+                      };
+
+                      return searchResult;
+                    }, msg.id._serialized, msg.from, senderId);
+                    
+                    console.log(`[WhatsApp Diagnostic] Message details from browser:`, JSON.stringify(info, null, 2));
+                  } catch (diagErr: any) {
+                    console.warn(`[WhatsApp Diagnostic] Failed to extract diagnostic info:`, diagErr.message);
+                  }
+                }
+              }
+              if (attempt <= maxRetries) {
+                const delay = baseDelay * attempt;
+                console.log(`[WhatsApp] Waiting ${delay}ms before retrying download...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
+            
             if (!media) {
-              await msg.reply("⚠️ Received a voice message, but was unable to retrieve the audio data.");
+              const isLid = msg.from.includes("@lid") || (msg.author && msg.author.includes("@lid"));
+              if (isLid) {
+                await this.client.sendMessage(senderId, "⚠️ Sorry, I could not process your voice note due to a WhatsApp Web limitation affecting privacy-masked Linked IDs (@lid).\n\nPlease try sending a text message or a regular audio file here instead!");
+              } else {
+                await this.client.sendMessage(senderId, "⚠️ Received a voice message, but was unable to retrieve the audio data. Please try sending it again or send it as a regular audio file.");
+              }
               return;
             }
             
@@ -340,26 +487,11 @@ export class WhatsAppBot {
           return; // Ignore empty message strings
         }
 
-        // The actual sender's phone number ID (msg.author exists for groups, msg.from for direct)
-        const senderId = msg.author || msg.from;
         console.log(`[WhatsApp] Processing input for ${senderId}: "${text}"`);
         let contactName = "";
-        let contactNumber = "";
         try {
           const contact = await msg.getContact();
           contactName = contact.pushname || contact.name || "";
-          
-          if (senderId.endsWith("@lid")) {
-            try {
-              const mapping = await this.client.getContactLidAndPhone([senderId]);
-              if (mapping && mapping[0] && mapping[0].pn) {
-                contactNumber = mapping[0].pn.split("@")[0];
-                console.log(`[WhatsApp] Successfully mapped LID ${senderId} to phone number: ${contactNumber}`);
-              }
-            } catch (lidErr: any) {
-              console.error("[WhatsApp] Failed to map LID to PN:", lidErr.message);
-            }
-          }
           
           if (!contactNumber) {
             contactNumber = contact.number || "";
@@ -401,15 +533,15 @@ export class WhatsAppBot {
           if (imagePath) {
             try {
               const media = MessageMedia.fromFilePath(imagePath);
-              sentMsgObj = await this.client.sendMessage(msg.from, media, { caption: textToReply });
+              sentMsgObj = await this.client.sendMessage(senderId, media, { caption: textToReply });
             } catch (imgErr: any) {
               console.error(`[WhatsApp] Failed to send onboarding image:`, imgErr.message);
               // Fallback: send text only
-              sentMsgObj = await msg.reply(textToReply);
+              sentMsgObj = await this.client.sendMessage(senderId, textToReply);
             }
           } else {
             // No image — send text reply normally
-            sentMsgObj = await msg.reply(textToReply);
+            sentMsgObj = await this.client.sendMessage(senderId, textToReply);
           }
 
           if (redactAfterMs && sentMsgObj) {
@@ -431,7 +563,7 @@ export class WhatsAppBot {
               if (chat) {
                 await chat.sendStateRecording();
               }
-              console.log(`[WhatsApp] Generating voice message reply for ${msg.from}...`);
+              console.log(`[WhatsApp] Generating voice message reply for ${senderId}...`);
               const tempSpeechPath = path.join(os.tmpdir(), `speech-${Date.now()}.ogg`);
               
               // Clean response text from markdown symbols so it sounds natural
@@ -447,7 +579,7 @@ export class WhatsAppBot {
               await generateSpeech(speechText, tempSpeechPath);
               
               const speechMedia = MessageMedia.fromFilePath(tempSpeechPath);
-              await this.client.sendMessage(msg.from, speechMedia, { sendAudioAsVoice: true });
+              await this.client.sendMessage(senderId, speechMedia, { sendAudioAsVoice: true });
               
               try {
                 fs.unlinkSync(tempSpeechPath);
