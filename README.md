@@ -95,7 +95,6 @@ stellapp/
 ├── contracts_wasm/           # Pre-compiled WASM binaries
 │   └── confidential_token.wasm
 ├── compiler_template/        # Cargo workspace used for dynamic contract compilation
-├── dashboard/                # Next.js 14 landing page & roadmap
 ├── prisma/                   # PostgreSQL schema (users, contacts, ZK registries)
 │   └── schema.prisma
 └── src/

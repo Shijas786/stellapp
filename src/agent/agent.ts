@@ -5,6 +5,12 @@ import { config } from "../services/config";
 import { prisma } from "../services/db";
 import fs from "fs";
 import dotenv from "dotenv";
+import { exec } from "child_process";
+import { promisify } from "util";
+import path from "path";
+import os from "os";
+
+const execAsync = promisify(exec);
 
 dotenv.config();
 
@@ -631,15 +637,45 @@ export async function runAgentLoop(
  * Transcribes an audio file (e.g. OGG/MP3) using OpenAI's Whisper API.
  */
 export async function transcribeAudio(filePath: string): Promise<string> {
-  console.log(`[Whisper] Sending ${filePath} for transcription...`);
-  const response = await openai.audio.transcriptions.create({
-    file: fs.createReadStream(filePath),
-    model: "whisper-1",
-    language: "en",
-    prompt: "This audio is in English. Please transcribe it clearly."
-  });
-  console.log(`[Whisper] Transcript: "${response.text}"`);
-  return response.text;
+  let fileToTranscribe = filePath;
+  let isTempWav = false;
+
+  // Whisper API does not support .ogg format natively.
+  // Convert .ogg / .opus files to .wav format using system ffmpeg.
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".ogg" || ext === ".opus") {
+    const wavPath = path.join(os.tmpdir(), `transcribe-${Date.now()}.wav`);
+    console.log(`[Whisper] Converting ${filePath} to WAV format at ${wavPath}...`);
+    try {
+      await execAsync(`ffmpeg -y -i "${filePath}" -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}"`);
+      fileToTranscribe = wavPath;
+      isTempWav = true;
+      console.log(`[Whisper] Conversion successful.`);
+    } catch (convErr: any) {
+      console.error(`[Whisper] Failed to convert audio using ffmpeg:`, convErr.message);
+      // Fallback: try sending the original file anyway
+    }
+  }
+
+  try {
+    console.log(`[Whisper] Sending ${fileToTranscribe} for transcription...`);
+    const response = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(fileToTranscribe),
+      model: "whisper-1",
+      language: "en",
+      prompt: "This audio is in English. Please transcribe it clearly."
+    });
+    console.log(`[Whisper] Transcript: "${response.text}"`);
+    return response.text;
+  } finally {
+    if (isTempWav) {
+      try {
+        fs.unlinkSync(fileToTranscribe);
+      } catch (e) {
+        console.error("Failed to delete temp WAV file:", e);
+      }
+    }
+  }
 }
 
 /**

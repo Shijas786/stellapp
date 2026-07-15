@@ -219,61 +219,7 @@ http.createServer(async (_req, res) => {
     }
   }
 
-  // 3. Redirect root / to Next.js basePath landing page /dashboard
-  if (parsedUrl.pathname === "/" && !query.token) {
-    res.writeHead(302, { Location: "/dashboard" });
-    res.end();
-    return;
-  }
 
-  // 3.5 Serve Next.js App Router (pages and assets mounted under /dashboard basePath)
-  if (parsedUrl.pathname?.startsWith("/dashboard")) {
-    let subpath = parsedUrl.pathname.substring("/dashboard".length);
-    let cleanSubpath = subpath.replace(/\/$/, "");
-    if (cleanSubpath === "") cleanSubpath = "/index";
-
-    // 3.6 Check for static HTML pages in Next.js export
-    const pagePaths = ["/index", "/login", "/roadmap", "/dashboard"];
-    if (pagePaths.includes(cleanSubpath) && !query.token) {
-      const pagePath = path.join(process.cwd(), "dashboard", "out", `${cleanSubpath.substring(1)}.html`);
-      if (fs.existsSync(pagePath)) {
-        res.writeHead(200, {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-        });
-        res.end(fs.readFileSync(pagePath));
-        return;
-      }
-    }
-
-    // 3.7 Check for static assets (chunks, files, media, styles) in Next.js export
-    const assetPath = path.join(process.cwd(), "dashboard", "out", subpath);
-    if (fs.existsSync(assetPath) && !fs.lstatSync(assetPath).isDirectory()) {
-      const ext = path.extname(assetPath);
-      let contentType = "application/octet-stream";
-      if (ext === ".css") contentType = "text/css";
-      else if (ext === ".js") contentType = "application/javascript";
-      else if (ext === ".png") contentType = "image/png";
-      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-      else if (ext === ".svg") contentType = "image/svg+xml";
-      else if (ext === ".webm") contentType = "video/webm";
-      else if (ext === ".json") contentType = "application/json";
-      else if (ext === ".txt") contentType = "text/plain";
-
-      // Hashed Next.js chunks can be cached permanently (immutable)
-      let cacheControl = "public, max-age=3600";
-      if (subpath.includes("/_next/static/")) {
-        cacheControl = "public, max-age=31536000, immutable";
-      }
-
-      res.writeHead(200, {
-        "Content-Type": contentType,
-        "Cache-Control": cacheControl
-      });
-      res.end(fs.readFileSync(assetPath));
-      return;
-    }
-  }
 
   // Require token verification to access the dashboard/setup page
   if (query.token !== ADMIN_SECRET) {

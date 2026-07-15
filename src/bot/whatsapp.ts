@@ -68,6 +68,11 @@ export class WhatsAppBot {
         dataPath: "/tmp/wwebjs_auth"
       }),
       authTimeoutMs: 60000,
+      webVersion: "2.3000.1043180520-alpha",
+      webVersionCache: {
+        type: "remote",
+        remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html"
+      },
       puppeteer: {
         headless: true,
         dumpio: true, // diagnostic: pipe Chromium stderr to Railway logs
@@ -439,7 +444,6 @@ export class WhatsAppBot {
               const wasTruncated = responseText.replace(/[\*\_`#\-•]/g, "").replace(/https?:\/\/\S+/g, "link").length > 400;
               const speechText = wasTruncated ? cleanText + "... See the text message for the full details." : cleanText;
               
-              const media = MessageMedia.fromFilePath(tempSpeechPath);
               await generateSpeech(speechText, tempSpeechPath);
               
               const speechMedia = MessageMedia.fromFilePath(tempSpeechPath);
@@ -466,7 +470,7 @@ export class WhatsAppBot {
           }
         }
       } catch (error: any) {
-        console.error(`[WhatsApp] Error processing message from ${msg.from}:`, error.message);
+        console.error(`[WhatsApp] Error processing message from ${msg.from}:`, error.stack || error);
         try {
           await msg.reply("⚠️ Sorry, I encountered an internal error processing that request. Please try again.");
         } catch (replyErr: any) {
