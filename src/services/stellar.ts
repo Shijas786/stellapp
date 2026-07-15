@@ -8,7 +8,10 @@ import {
   rpc,
   xdr,
   Address,
-  nativeToScVal
+  nativeToScVal,
+  hash,
+  StrKey,
+  Account
 } from "@stellar/stellar-sdk";
 import axios from "axios";
 import crypto from "crypto";
@@ -1029,7 +1032,8 @@ export async function uploadWasm(
  */
 export async function instantiateContract(
   secretKey: string,
-  wasmHashHex: string
+  wasmHashHex: string,
+  salt: Buffer = crypto.randomBytes(32)
 ): Promise<{ contractId: string; txHash: string }> {
   if (!/^[a-fA-F0-9]{64}$/.test(wasmHashHex)) {
     throw new Error("WASM hash must be exactly 32 bytes of hexadecimal data.");
@@ -1037,7 +1041,6 @@ export async function instantiateContract(
 
   const sourceKeypair = Keypair.fromSecret(secretKey);
   const publicKey = sourceKeypair.publicKey();
-  const salt = crypto.randomBytes(32);
 
   const submission = await withSequenceRetry(publicKey, async () => {
     const account = await horizonServer.loadAccount(publicKey);
@@ -1106,12 +1109,35 @@ export async function instantiateContract(
   };
 }
 
+function deriveContractId(deployer: string, salt: Buffer, passphrase: string): string {
+  const deployerAddress = Address.fromString(deployer);
+  const contractIdPreimage = xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+    new xdr.ContractIdPreimageFromAddress({
+      address: deployerAddress.toScAddress(),
+      salt: salt
+    })
+  );
+
+  const passphraseHash = hash(Buffer.from(passphrase));
+
+  const hashIdPreimage = xdr.HashIdPreimage.envelopeTypeContractId(
+    new xdr.HashIdPreimageContractId({
+      networkId: passphraseHash,
+      contractIdPreimage
+    })
+  );
+
+  const contractIdHash = hash(hashIdPreimage.toXDR());
+  return StrKey.encodeContract(contractIdHash);
+}
+
 /**
  * Deploys the Privacy Pool contract and initializes it with dynamic USDC asset contract ID.
  */
 export async function deployPrivacyPool(
   secretKey: string,
-  assetCode: string = "USDC"
+  assetCode: string = "USDC",
+  denominationAmount: string = "10"
 ): Promise<{ contractId: string; txHash: string }> {
   let wasmPath = path.join(
     process.cwd(),
@@ -1142,33 +1168,46 @@ export async function deployPrivacyPool(
   const { wasmHash } = await uploadWasm(secretKey, wasmBytes);
   console.log(`[Stellar] WASM uploaded. Hash: ${wasmHash}`);
 
+  console.log("[Stellar] Building and submitting atomic instantiate & initialize transaction...");
+  const sourceKeypair = Keypair.fromSecret(secretKey);
+  const publicKey = sourceKeypair.publicKey();
+  
+  const salt = crypto.randomBytes(32);
+  const passphrase = getPassphrase();
+  const contractId = deriveContractId(publicKey, salt, passphrase);
+  console.log(`[Stellar] Derived contract ID off-chain: ${contractId}`);
+
   console.log("[Stellar] Instantiating Privacy Pool contract...");
-  const { contractId } = await instantiateContract(secretKey, wasmHash);
-  console.log(`[Stellar] Contract instantiated. ID: ${contractId}`);
+  const { contractId: instantiatedId, txHash: deployTxHash } = await instantiateContract(secretKey, wasmHash, salt);
+  if (instantiatedId !== contractId) {
+    throw new Error(`Off-chain derived contract ID (${contractId}) does not match simulated contract ID (${instantiatedId})`);
+  }
+  console.log(`[Stellar] Contract instantiated. ID: ${contractId}. Tx: ${deployTxHash}`);
 
   const tokenAsset =
     normalizedAssetCode === "XLM" ? Asset.native() : USDC_ASSET;
-  const tokenContractId = tokenAsset.contractId(getPassphrase());
-  const publicKey = Keypair.fromSecret(secretKey).publicKey();
+  const tokenContractId = tokenAsset.contractId(passphrase);
 
   console.log(
-    `[Stellar] Initializing Privacy Pool with Admin: ${publicKey} and ` +
-    `Token (${normalizedAssetCode}) Contract ID: ${tokenContractId}`
+    `[Stellar] Initializing Privacy Pool with Admin: ${publicKey}, ` +
+    `Token (${normalizedAssetCode}) Contract ID: ${tokenContractId}, Denomination: ${denominationAmount}`
   );
 
-  const initTx = await invokeContractMethod(
+  const initTxHash = await invokeContractMethod(
     secretKey,
     contractId,
     "initialize",
     [
       xdr.ScVal.scvAddress(Address.fromString(publicKey).toScAddress()),
-      xdr.ScVal.scvAddress(Address.fromString(tokenContractId).toScAddress())
+      xdr.ScVal.scvAddress(Address.fromString(tokenContractId).toScAddress()),
+      amountToI128ScVal(denominationAmount, "denomination"),
+      xdr.ScVal.scvBytes(salt)
     ]
   );
 
   return {
     contractId,
-    txHash: initTx
+    txHash: initTxHash
   };
 }
 
@@ -1318,10 +1357,37 @@ export async function getPrivacyPoolRoot(
   try {
     validateStellarAddress(contractId, "contract ID");
 
-    // Fallback: many Circom tornado-style Soroban pools store root in contract storage.
-    // Until a read-only `get_root` endpoint is confirmed in the ABI, we return null
-    // so the upstream code gracefully skips the check rather than hard-blocking.
-    return null;
+    const fakeAccount = new Account("GAMH4JGUE6U2XX32MHFZWRV4KFH5OSNCFV3IVQY3M4SCWRIIJMFX5F4X", "0");
+    const tx = new TransactionBuilder(fakeAccount, {
+      fee: "100000",
+      networkPassphrase: getPassphrase()
+    })
+      .addOperation(
+        Operation.invokeContractFunction({
+          contract: contractId,
+          function: "get_root",
+          args: []
+        })
+      )
+      .setTimeout(30)
+      .build();
+
+    const simulation = await rpcServer.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(simulation)) {
+      console.warn(`[Stellar] getPrivacyPoolRoot simulation failed: ${simulation.error}`);
+      return null;
+    }
+
+    const retval = (simulation as any).result?.retval;
+    if (!retval) return null;
+    const buf = retval.bytes();
+    if (!buf) return null;
+
+    let res = 0n;
+    for (let i = 0; i < buf.length; i++) {
+      res = (res << 8n) + BigInt(buf[i]);
+    }
+    return res.toString();
   } catch (error: unknown) {
     console.warn(
       `[Stellar] getPrivacyPoolRoot failed for ${contractId}: ${getErrorMessage(

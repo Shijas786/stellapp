@@ -18,6 +18,7 @@ pub enum PoolError {
     NotInitialized = 7,
     AmountMismatch = 8,
     NonCanonicalFieldElement = 9,
+    RootExpired = 10,
 }
 
 mod vk;
@@ -43,6 +44,7 @@ pub enum DataKey {
     CurrentRoot,
     Nullifier(BytesN<32>),
     Denomination,
+    RootLedger,
 }
 
 const BLS12_381_R: [u8; 32] = [
@@ -75,16 +77,27 @@ pub struct PrivacyPool;
 
 #[contractimpl]
 impl PrivacyPool {
-    /// Initialize the privacy pool with the USDC token address and the Verifying Key
-    pub fn initialize(env: Env, admin: Address, token: Address) {
+    /// Initialize the privacy pool with the admin address, token address, denomination, and deployment salt
+    pub fn initialize(env: Env, admin: Address, token: Address, denomination: i128, salt: BytesN<32>) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("Already initialized");
+        }
+        if denomination <= 0 {
+            panic!("Invalid denomination");
+        }
+        // Prevent frontrunning by verifying the derived deployment address matches current contract ID
+        let expected_address = env.deployer().with_address(admin.clone(), salt).deployed_address();
+        if expected_address != env.current_contract_address() {
+            panic!("Unauthorized initializer");
         }
         // Prevent frontrunning by verifying the admin authorized the initialization
         admin.require_auth();
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
+        env.storage().instance().set(&DataKey::Denomination, &denomination);
+        env.storage().instance().set(&DataKey::CurrentRoot, &BytesN::from_array(&env, &[0; 32]));
+        env.storage().instance().set(&DataKey::RootLedger, &env.ledger().sequence());
         extend_instance_ttl(&env);
     }
 
@@ -96,6 +109,7 @@ impl PrivacyPool {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
         env.storage().instance().set(&DataKey::CurrentRoot, &new_root);
+        env.storage().instance().set(&DataKey::RootLedger, &env.ledger().sequence());
         extend_instance_ttl(&env);
     }
 
@@ -108,18 +122,14 @@ impl PrivacyPool {
     /// User deposits USDC into the pool (adds commitment)
     pub fn deposit(env: Env, from: Address, amount: i128, commitment: BytesN<32>) {
         from.require_auth();
+        if !is_canonical(&commitment) {
+            panic!("Non-canonical commitment");
+        }
         
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
 
-        // Fixed Denomination logic: Lock pool to the amount of the first deposit (Fix 1.2 part 1)
-        let denomination_key = DataKey::Denomination;
-        let denomination: i128 = if env.storage().instance().has(&denomination_key) {
-            env.storage().instance().get(&denomination_key).unwrap()
-        } else {
-            env.storage().instance().set(&denomination_key, &amount);
-            amount
-        };
+        let denomination: i128 = env.storage().instance().get(&DataKey::Denomination).unwrap();
 
         if amount != denomination {
             panic!("Amount must match pool denomination");
@@ -149,6 +159,13 @@ impl PrivacyPool {
         // 0. Verification that the pool has been initialized
         if !env.storage().instance().has(&DataKey::Admin) {
             return Err(PoolError::NotInitialized);
+        }
+
+        // 0.1 Check if the current root has expired (prevent proof replay after nullifier TTL)
+        let root_ledger: u32 = env.storage().instance().get(&DataKey::RootLedger).unwrap_or(0);
+        let current_ledger = env.ledger().sequence();
+        if current_ledger > root_ledger + 400_000 {
+            return Err(PoolError::RootExpired);
         }
 
         // Validate that all public signals represent canonical BLS12-381 field elements (strictly less than R)
