@@ -7,6 +7,23 @@ import { handleIncomingMessage } from "./controller";
 import { transcribeAudio, generateSpeech, injectContextMessage } from "../agent/agent";
 import { prisma } from "../services/db";
 
+function chmodRecursive(dirPath: string) {
+  try {
+    const stat = fs.statSync(dirPath);
+    if (stat.isDirectory()) {
+      fs.chmodSync(dirPath, 0o700);
+      const files = fs.readdirSync(dirPath);
+      for (const file of files) {
+        chmodRecursive(path.join(dirPath, file));
+      }
+    } else {
+      fs.chmodSync(dirPath, 0o600);
+    }
+  } catch (err: any) {
+    console.warn(`[WhatsApp] Failed to set permissions on ${dirPath}:`, err.message);
+  }
+}
+
 export class WhatsAppBot {
   private client: Client;
 
@@ -39,13 +56,7 @@ export class WhatsAppBot {
       console.log("[WhatsApp Sync] Restoring session from persistent volume to local /tmp...");
       try {
         fs.mkdirSync(tempSession, { recursive: true });
-        try {
-          const { execSync } = require("child_process");
-          execSync(`cp -rf "${volumeSession}/." "${tempSession}/"`);
-        } catch (execErr: any) {
-          console.warn("[WhatsApp Sync] cp shell command failed on restore, falling back to fs.cpSync:", execErr.message);
-          fs.cpSync(volumeSession, tempSession, { recursive: true, force: true });
-        }
+        fs.cpSync(volumeSession, tempSession, { recursive: true, force: true });
         console.log("[WhatsApp Sync] Session restoration complete.");
       } catch (cpErr: any) {
         console.error("[WhatsApp Sync] Failed to restore session to /tmp:", cpErr.message);
@@ -113,14 +124,10 @@ export class WhatsAppBot {
       for (const authDir of pathsToClean) {
         if (!fs.existsSync(authDir)) continue;
 
-        // Recursively grant read/write/execute permissions to prevent permission-denied storage errors inside Docker
-        try {
-          const { execSync } = require("child_process");
-          execSync(`chmod -R 777 "${authDir}"`);
-          console.log(`[WhatsApp] Successfully set write permissions on directory: ${authDir}`);
-        } catch (chmodErr: any) {
-          console.warn(`[WhatsApp] Failed to recursively set permissions on ${authDir}:`, chmodErr.message);
-        }
+        // Recursively set secure permissions (700 for directories, 600 for files)
+        // to prevent other local users/processes on the host from reading session tokens.
+        chmodRecursive(authDir);
+        console.log(`[WhatsApp] Successfully secured file permissions on directory: ${authDir}`);
 
         // Specifically remove all Chromium lock files that cause the "profile appears to be in use" (Code 21) crash loop
         const sessionDirs = [
@@ -657,11 +664,10 @@ export class WhatsAppBot {
         }
 
         try {
-          const { execSync } = require("child_process");
-          execSync(`cp -rf "${tempSession}/." "${volumeSession}/"`);
-        } catch (execErr: any) {
-          console.warn("[WhatsApp Sync] cp shell command failed on backup, falling back to fs.cpSync:", execErr.message);
           fs.cpSync(tempSession, volumeSession, { recursive: true, force: true });
+        } catch (cpErr: any) {
+          console.warn("[WhatsApp Sync] Native backup cpSync failed, error details:", cpErr.message);
+          throw cpErr;
         }
         console.log("[WhatsApp Sync] Session backup completed successfully.");
       }

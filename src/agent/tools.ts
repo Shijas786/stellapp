@@ -1042,7 +1042,7 @@ export async function executeTool(
         pending.args.amount === args.amount &&
         pending.args.asset === args.asset;
 
-      if ((!pending || !argsMatch) && !isConfirmed) {
+      if (!pending || !argsMatch || !isConfirmed) {
         await savePendingAction(chatId, "send_stellar", {
           recipient: args.recipient, // original human-readable name/phone
           resolvedAddr: recipient,   // resolved G address — used by intent-router confirm handler
@@ -1143,7 +1143,7 @@ export async function executeTool(
         swapPending.args.amount === args.amount &&
         swapPending.args.direction === args.direction;
 
-      if ((!swapPending || !swapArgsMatch) && !swapConfirmed) {
+      if (!swapPending || !swapArgsMatch || !swapConfirmed) {
         await savePendingAction(chatId, "swap_stellar", args);
         const readableDir = args.direction === "XLM_TO_USDC" ? "XLM → USDC" : "USDC → XLM";
         return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm they want to swap ${args.amount} ${readableDir}. Instruct them to reply 'yes' or 'confirm' to execute this swap.`;
@@ -1181,7 +1181,7 @@ export async function executeTool(
         pending.args.toAsset === args.toAsset &&
         pending.args.totalSwaps === args.totalSwaps;
 
-      if ((!pending || !argsMatch) && !confirmed) {
+      if (!pending || !argsMatch || !confirmed) {
         await savePendingAction(chatId, "schedule_recurring_swap", {
           ...args,
           intervalSeconds: intervalSeconds.toString()
@@ -1317,7 +1317,7 @@ export async function executeTool(
         pending.args.assetCode === args.assetCode &&
         pending.args.totalTransfers === args.totalTransfers;
 
-      if ((!pending || !argsMatch) && !confirmed) {
+      if (!pending || !argsMatch || !confirmed) {
         await savePendingAction(chatId, "schedule_recurring_transfer", {
           ...args,
           intervalSeconds: intervalSeconds.toString()
@@ -1408,7 +1408,7 @@ export async function executeTool(
         relPending.name === "release_escrow" &&
         relPending.args.contractId === args.contractId;
 
-      if ((!relPending || !relArgsMatch) && !relConfirmed) {
+      if (!relPending || !relArgsMatch || !relConfirmed) {
         await savePendingAction(chatId, "release_escrow", args);
         return `CONFIRMATION_REQUIRED: Releasing escrow contract ${args.contractId} will send the locked funds to the recipient — this is irreversible. You must ask the user to explicitly confirm by replying 'yes' or 'confirm'.`;
       }
@@ -1433,7 +1433,7 @@ export async function executeTool(
         refPending.name === "refund_escrow" &&
         refPending.args.contractId === args.contractId;
 
-      if ((!refPending || !refArgsMatch) && !refConfirmed) {
+      if (!refPending || !refArgsMatch || !refConfirmed) {
         await savePendingAction(chatId, "refund_escrow", args);
         return `CONFIRMATION_REQUIRED: Refunding escrow contract ${args.contractId} will return the locked funds to the sender — this is irreversible. You must ask the user to explicitly confirm by replying 'yes' or 'confirm'.`;
       }
@@ -2441,7 +2441,7 @@ ${rustCode}
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "export_wallet";
 
-      if ((!pending || !argsMatch) && !isConfirmed) {
+      if (!pending || !argsMatch || !isConfirmed) {
         await savePendingAction(chatId, "export_wallet", {});
         return `CONFIRMATION_REQUIRED: You must warn the user about the security risk of displaying their private key in chat, and ask them to explicitly confirm by replying 'yes' or 'confirm' to view it.`;
       }
