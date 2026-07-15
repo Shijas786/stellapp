@@ -24,13 +24,7 @@ function g1ToRust(arr) {
 }
 
 function g2ToRust(arr) {
-    // G2 coordinates are elements of Fq2. Fq2 = c0 + c1 * u
-    // In snarkjs: [ [c1, c0], [c1, c0] ] ? Actually snarkjs G2 format is [ [x0, x1], [y0, y1] ] but it might be [ [c0, c1], ... ] or [ [c1, c0], ... ]
-    // Wait, the arkworks serialization for Fq2 is c0 then c1.
-    // Snarkjs uses [x_real, x_imaginary]. In Ethereum/Snarkjs, G2 is x = x0 + x1 * u. Snarkjs outputs [x1, x0].
-    // Let's assume arkworks expects c0 then c1. So we reverse them: [x0, x1].
-    // Snarkjs: arr[0][0] is x_c1, arr[0][1] is x_c0. (SnarkJS format is swapped compared to Zcash/Arkworks).
-    // Let's swap them.
+    // Fq2 = c0 + c1 * u
     const x1 = hexToBytes(arr[0][0], 48); // x_c1
     const x0 = hexToBytes(arr[0][1], 48); // x_c0
     

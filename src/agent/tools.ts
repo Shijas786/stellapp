@@ -1,5 +1,5 @@
 import { encrypt, decrypt, encryptForUser, decryptForUserWithMigration } from "../services/encryption";
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, xdr } from "@stellar/stellar-sdk";
 import * as stellar from "../services/stellar";
 import { getSinglePrice, getLivePrices, formatPriceMessage } from "../services/price";
 import { config } from "../services/config";
@@ -1901,6 +1901,30 @@ ${rustCode}
           spent: false
         }
       });
+
+      // Calculate the new Merkle root and try to update it on-chain (if the user is the admin)
+      try {
+        const siblingIndex = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
+        const allDeposits = await prisma.privacyDeposit.findMany({
+          where: { contractId: poolContractId },
+          orderBy: { leafIndex: "asc" }
+        });
+        const sibling = allDeposits.find(d => d.leafIndex === siblingIndex);
+        const siblingHex = sibling ? sibling.commitmentHex : "0";
+        const pathElements = [siblingHex, "0", "0", "0"];
+        const pathIndices = [String(leafIndex % 2), "0", "0", "0"];
+        
+        const newRoot = await zkPool.computeRoot(commitment, pathElements, pathIndices);
+        const newRootHex = BigInt(newRoot).toString(16).padStart(64, "0");
+
+        console.log(`[ZK Pool] Attempting to update Merkle root on-chain to ${newRootHex}...`);
+        await stellar.invokeContractMethod(stellarSecret, poolContractId, "update_root", [
+          xdr.ScVal.scvBytes(Buffer.from(newRootHex, "hex"))
+        ]);
+        console.log(`[ZK Pool] Merkle root updated successfully on-chain.`);
+      } catch (rootErr: any) {
+        console.warn(`[ZK Pool] Skip root update check (non-admin or simulation failed): ${rootErr.message}`);
+      }
 
       // Generate client secret note format
       const secretNote = `stellapp-zk-v1_${poolContractId}_${amountStr}_${secret}_${nullifier}`;

@@ -206,8 +206,9 @@ impl PrivacyPool {
             return Err(PoolError::RecipientMismatch);
         }
 
-        // 5. Prevent proof hijacking: Require authorization from the recipient (Fix 1.3 part 1)
-        to.require_auth();
+        // 5. Prevent proof hijacking: Since the destination address is verified against the ZK proof public signals (recipient_hi/lo),
+        // the proof is cryptographically bound to the recipient. No signature from the recipient is needed, which enables relayer support
+        // and private transfers to other users/contracts directly.
 
         // 6. Load Verification Key from hardcoded vk.rs
         let vk: VerificationKey = get_vk(&env);
