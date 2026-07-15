@@ -1098,10 +1098,7 @@ http.createServer(async (_req, res) => {
                       <td class="label" style="padding: 8px 0;">USDC Asset Code</td>
                       <td class="val" style="padding: 8px 0; font-size: 13px;">${process.env.USDC_ASSET_CODE || 'USDC'}</td>
                     </tr>
-                    <tr>
-                      <td class="label" style="padding: 8px 0;">Escrow WASM</td>
-                      <td class="val" style="padding: 8px 0; font-size: 13px;">${process.env.ESCROW_WASM_HASH ? process.env.ESCROW_WASM_HASH.substring(0, 16) + '...' : 'Not loaded'}</td>
-                    </tr>
+
                   </table>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">

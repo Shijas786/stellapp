@@ -433,8 +433,8 @@ async function processContractWatchers() {
       const typeMatch = content.match(/-\s*\*Contract Type\*\*:\s*(.+)/i);
       const type = typeMatch ? typeMatch[1].trim().toLowerCase() : "";
       
-      // We only watch vesting, escrow, or timelock contracts
-      if (!type.includes("vesting") && !type.includes("escrow") && !type.includes("timelock")) {
+      // We only watch vesting or timelock contracts
+      if (!type.includes("vesting") && !type.includes("timelock")) {
         continue;
       }
 

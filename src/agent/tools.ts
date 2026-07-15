@@ -1381,74 +1381,7 @@ export async function executeTool(
       return `Successfully scheduled Limit Order: Swap ${args.amount} ${args.fromAsset} → ${args.toAsset} when price reaches ${conditionLabel} ${args.triggerPrice} USDC/XLM.`;
     }
 
-    case "deploy_escrow_contract": {
-      await sendNotification(chatId, "⏳ *Deploying Escrow Contract...*\n\nThis involves compiling the Rust smart contract to WASM and deploying it to the Stellar network. It usually takes 30-45 seconds. Please wait!");
-      const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
-      const { contractId, txHash } = await stellar.deployEscrowContract(
-        stellarSecret,
-        args.recipientAddress,
-        args.arbiterAddress,
-        args.maxAmount
-      );
 
-      return {
-        success: true,
-        contractId,
-        txHash,
-        explorerUrl: `${config.explorerUrlStellar}${txHash}`,
-        contractExplorerUrl: `${config.explorerUrlStellarContract}${contractId}`
-      };
-    }
-
-    case "release_escrow": {
-      // Confirmation Gate — releasing escrow is irreversible
-      const relPending = await getPendingAction(chatId);
-      const relConfirmed = await isLatestMessageConfirmation(chatId);
-      const relArgsMatch = relPending &&
-        relPending.name === "release_escrow" &&
-        relPending.args.contractId === args.contractId;
-
-      if (!relPending || !relArgsMatch || !relConfirmed) {
-        await savePendingAction(chatId, "release_escrow", args);
-        return `CONFIRMATION_REQUIRED: Releasing escrow contract ${args.contractId} will send the locked funds to the recipient — this is irreversible. You must ask the user to explicitly confirm by replying 'yes' or 'confirm'.`;
-      }
-
-      await clearPendingAction(chatId);
-      const relSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
-      const relTxHash = await stellar.releaseEscrowContract(relSecret, args.contractId);
-
-      return {
-        success: true,
-        contractId: args.contractId,
-        txHash: relTxHash,
-        explorerUrl: `${config.explorerUrlStellar}${relTxHash}`
-      };
-    }
-
-    case "refund_escrow": {
-      // Confirmation Gate — refunding escrow is irreversible
-      const refPending = await getPendingAction(chatId);
-      const refConfirmed = await isLatestMessageConfirmation(chatId);
-      const refArgsMatch = refPending &&
-        refPending.name === "refund_escrow" &&
-        refPending.args.contractId === args.contractId;
-
-      if (!refPending || !refArgsMatch || !refConfirmed) {
-        await savePendingAction(chatId, "refund_escrow", args);
-        return `CONFIRMATION_REQUIRED: Refunding escrow contract ${args.contractId} will return the locked funds to the sender — this is irreversible. You must ask the user to explicitly confirm by replying 'yes' or 'confirm'.`;
-      }
-
-      await clearPendingAction(chatId);
-      const refSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
-      const refTxHash = await stellar.refundEscrowContract(refSecret, args.contractId);
-
-      return {
-        success: true,
-        contractId: args.contractId,
-        txHash: refTxHash,
-        explorerUrl: `${config.explorerUrlStellar}${refTxHash}`
-      };
-    }
 
     case "deploy_custom_contract": {
       // Enforce Confirmation Gate
@@ -1505,8 +1438,6 @@ export async function executeTool(
         const proposal = args.proposal || args.description || "Community Vote";
         console.log(`[Tools] Using hardcoded VOTING template: ${name} - ${proposal}`);
         rustCode = getVotingContractTemplate(name, proposal);
-      } else if (contractType === "escrow") {
-        rustCode = templates.ESCROW_TEMPLATE;
       } else if (contractType === "streaming_payment") {
         rustCode = templates.STREAMING_PAYMENT_TEMPLATE;
       } else if (contractType === "multisig") {

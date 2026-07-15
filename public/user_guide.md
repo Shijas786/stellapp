@@ -59,14 +59,7 @@ You can write, compile, and deploy custom Soroban Rust contracts directly throug
 Describe the contract you want to deploy, and the bot will conduct a step-by-step interview to gather details:
 * **Token/Coin**: Collects Name, Ticker symbol, Initial supply, and Decimals.
 * **NFT Collection**: Collects Collection name, Ticker symbol, Max supply, and Admin.
-* **Escrow**: Locks USDC/XLM in a secure vault, released by a third-party Arbiter.
 
-### Interactive Escrow Flow:
-1. Ask: **"Deploy an escrow contract"**.
-2. The bot will guide you through collecting the **Recipient**, **Arbiter**, and **Locked Amount**.
-3. It will present a summary for you to verify. Reply **"Confirm"** to deploy.
-
----
 
 ## 🎓 5. Developer Tools & Audits
 

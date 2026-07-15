@@ -48,7 +48,7 @@ const HELP_PATTERNS = [
 // These require contract generation, ZK proofs, or complex multi-step reasoning — always GPT
 const COMPLEX_PATTERNS = [
   /\b(deploy|write|create|build|compile|audit|generate|code|program)\b.*\b(contract|smart contract|soroban|wasm)\b/i,
-  /\b(escrow|vesting|timelock|crowdfund|nft|token contract|dao)\b/i,
+  /\b(vesting|timelock|crowdfund|nft|token contract|dao)\b/i,
   /\b(confidential|private|zk|zero.?knowledge|privacy pool|proof|proving)\b/i,
   /\b(bridge|cctp|cross.?chain)\b/i,
   /\b(explain|understand|what is|how does|why|debug|error|failed)\b.*\b(contract|soroban|stellar sdk|transaction)\b/i,
@@ -153,7 +153,6 @@ const HELP_TEXT = `🤖 *Stellapp — What can I do?*
 • "Bridge 10 USDC to Stellar"
 
 📜 *Smart Contracts*
-• "Deploy an escrow contract"
 • "Build a vesting vault"
 
 🔒 *ZK Privacy*

@@ -382,65 +382,6 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "deploy_escrow_contract",
-      description: "Deploy a Soroban Escrow contract on Stellar for the user.",
-      parameters: {
-        type: "object",
-        properties: {
-          recipientAddress: {
-            type: "string",
-            description: "The Stellar address of the recipient of the escrow funds (starts with G)"
-          },
-          arbiterAddress: {
-            type: "string",
-            description: "The Stellar address of the arbiter who resolves disputes and decides release/refund (starts with G)"
-          },
-          maxAmount: {
-            type: "string",
-            description: "The amount of USDC to lock in the escrow (e.g. '500.0')"
-          }
-        },
-        required: ["recipientAddress", "arbiterAddress", "maxAmount"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "release_escrow",
-      description: "As the Arbiter, release the locked funds in the escrow contract to the recipient.",
-      parameters: {
-        type: "object",
-        properties: {
-          contractId: {
-            type: "string",
-            description: "The contract address of the deployed escrow (starts with C)"
-          }
-        },
-        required: ["contractId"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "refund_escrow",
-      description: "As the Arbiter, refund the locked funds in the escrow contract back to the depositor.",
-      parameters: {
-        type: "object",
-        properties: {
-          contractId: {
-            type: "string",
-            description: "The contract address of the deployed escrow (starts with C)"
-          }
-        },
-        required: ["contractId"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
       name: "deploy_custom_contract",
       description: "Deploy a Soroban smart contract on Stellar. Generates the Rust code (if custom), compiles it cleanly to WASM bytecode (with automated self-healing for compilation errors), and deploys it on-chain.",
       parameters: {
@@ -448,7 +389,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
         properties: {
           contractType: {
             type: "string",
-            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance", "escrow", "streaming_payment", "multisig", "bounty", "payment_splitter", "airdrop", "swap_dex", "lending", "custom"],
+            enum: ["token", "nft", "coin", "timelock", "vesting", "staking", "voting", "governance", "streaming_payment", "multisig", "bounty", "payment_splitter", "airdrop", "swap_dex", "lending", "custom"],
             description: "The type of contract to deploy. Use 'custom' for custom Rust deployments."
           },
           name: {
@@ -722,7 +663,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
         properties: {
           key: {
             type: "string",
-            description: "The parameter key to save (e.g. 'escrowRecipient', 'escrowArbiter', 'escrowAmount')"
+            description: "The parameter key to save (e.g. 'vestingRecipient', 'vestingCliff', 'vestingAmount')"
           },
           value: {
             type: "string",
@@ -761,7 +702,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "watch_contract",
-      description: "Registers a smart contract lock or cliff watcher (e.g. for vesting, lock, or escrow contracts) to notify the user when the cliff/lock duration passes.",
+      description: "Registers a smart contract lock or cliff watcher (e.g. for vesting or lock contracts) to notify the user when the cliff/lock duration passes.",
       parameters: {
         type: "object",
         properties: {
@@ -771,7 +712,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           },
           contractType: {
             type: "string",
-            description: "The type of lock contract (e.g., 'vesting', 'escrow', 'timelock')."
+            description: "The type of lock contract (e.g., 'vesting', 'timelock')."
           },
           cliffTime: {
             type: "string",

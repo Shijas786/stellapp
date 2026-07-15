@@ -56,54 +56,6 @@ impl NFTContract {
 }
 `;
 
-export const ESCROW_TEMPLATE = `
-#![no_std]
-use soroban_sdk::{contract, contractimpl, Env, Symbol, Address, String, vec};
-
-#[contract]
-pub struct EscrowContract;
-
-#[contractimpl]
-impl EscrowContract {
-    pub fn initialize(env: Env, buyer: Address, seller: Address, arbiter: Address, amount: i128, timeout_seconds: u64) {
-        env.storage().persistent().set(&Symbol::new(&env, "buyer"), &buyer);
-        env.storage().persistent().set(&Symbol::new(&env, "seller"), &seller);
-        env.storage().persistent().set(&Symbol::new(&env, "arbiter"), &arbiter);
-        env.storage().persistent().set(&Symbol::new(&env, "amount"), &amount);
-        env.storage().persistent().set(&Symbol::new(&env, "status"), &Symbol::new(&env, "pending"));
-        env.storage().persistent().set(&Symbol::new(&env, "deadline"), &(env.ledger().timestamp() + timeout_seconds as u64));
-    }
-
-    pub fn deposit(env: Env, buyer: Address, amount: i128) {
-        buyer.require_auth();
-        let stored_amount: i128 = env.storage().persistent().get(&Symbol::new(&env, "amount")).unwrap_or(0);
-        if amount != stored_amount { panic!("Amount mismatch"); }
-        env.storage().persistent().set(&Symbol::new(&env, "status"), &Symbol::new(&env, "funded"));
-    }
-
-    pub fn confirm_delivery(env: Env, seller: Address) {
-        seller.require_auth();
-        let status: Symbol = env.storage().persistent().get(&Symbol::new(&env, "status")).unwrap_or_else(|| Symbol::new(&env, "pending"));
-        if status != Symbol::new(&env, "funded") { panic!("Not funded"); }
-        env.storage().persistent().set(&Symbol::new(&env, "status"), &Symbol::new(&env, "completed"));
-    }
-
-    pub fn release(env: Env, arbiter: Address) -> bool {
-        arbiter.require_auth();
-        let status: Symbol = env.storage().persistent().get(&Symbol::new(&env, "status")).unwrap_or_else(|| Symbol::new(&env, "pending"));
-        if status != Symbol::new(&env, "completed") { panic!("Work not confirmed"); }
-        env.storage().persistent().set(&Symbol::new(&env, "status"), &Symbol::new(&env, "released"));
-        true
-    }
-
-    pub fn refund(env: Env) -> bool {
-        let deadline: u64 = env.storage().persistent().get(&Symbol::new(&env, "deadline")).unwrap_or(0);
-        if env.ledger().timestamp() < deadline { panic!("Deadline not reached"); }
-        env.storage().persistent().set(&Symbol::new(&env, "status"), &Symbol::new(&env, "refunded"));
-        true
-    }
-}
-`;
 
 export const STREAMING_PAYMENT_TEMPLATE = `
 #![no_std]
