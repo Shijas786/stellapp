@@ -221,26 +221,98 @@ http.createServer(async (_req, res) => {
 
 
 
-  // Require token verification to access the dashboard/setup page
-  if (query.token !== ADMIN_SECRET) {
+  // Helper to parse cookies safely
+  const cookiesHeader = _req.headers.cookie || "";
+  let sessionToken = "";
+  const cookieMatch = cookiesHeader.match(/session_token=([^;]+)/);
+  if (cookieMatch) {
+    sessionToken = decodeURIComponent(cookieMatch[1]);
+  }
+
+  // Helper to read POST body
+  const getPostBody = (req: http.IncomingMessage): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      let body = "";
+      req.on("data", chunk => { body += chunk.toString(); });
+      req.on("end", () => resolve(body));
+      req.on("error", err => reject(err));
+    });
+  };
+
+  // 1. Handle POST-based login
+  if (_req.method === "POST" && parsedUrl.pathname === "/login") {
+    try {
+      const body = await getPostBody(_req);
+      const params = new URLSearchParams(body);
+      const postToken = params.get("token") || "";
+
+      if (ADMIN_SECRET.length > 0 && postToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(postToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
+        res.writeHead(302, {
+          "Set-Cookie": `session_token=${encodeURIComponent(ADMIN_SECRET)}; Path=/; HttpOnly; SameSite=Strict`,
+          "Location": "/"
+        });
+        res.end();
+        return;
+      }
+    } catch (e) {
+      console.error("Login parsing error:", e);
+    }
+    res.writeHead(302, { "Location": "/?error=invalid_token" });
+    res.end();
+    return;
+  }
+
+  // 2. Handle POST-based logout
+  if (_req.method === "POST" && parsedUrl.pathname === "/logout") {
+    res.writeHead(302, {
+      "Set-Cookie": "session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
+      "Location": "/"
+    });
+    res.end();
+    return;
+  }
+
+  // 3. Verify access authorization (timing-safe verification)
+  let isAuthorized = false;
+  const queryToken = typeof query.token === "string" ? query.token : "";
+
+  if (ADMIN_SECRET.length > 0) {
+    if (queryToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(queryToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
+      isAuthorized = true;
+    } else if (sessionToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(sessionToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
+      isAuthorized = true;
+    }
+  }
+
+  // 4. Render login page if not authorized
+  if (!isAuthorized) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+    const hasError = query.error === "invalid_token";
     res.end(`
       <html>
         <head>
           <title>🔒 Administration Panel Locked</title>
           <style>
             body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 420px; border: 1px solid #334155; }
+            .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 420px; border: 1px solid #334155; width: 100%; box-sizing: border-box; }
             h2 { color: #f43f5e; margin-top: 0; }
-            p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
-            code { display: block; background: #0f172a; padding: 12px; border-radius: 8px; font-size: 14px; color: #38bdf8; margin-top: 20px; font-family: monospace; border: 1px solid #1e293b; }
+            p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+            input[type="password"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; font-size: 16px; margin-bottom: 16px; box-sizing: border-box; }
+            input[type="password"]:focus { outline: none; border-color: #38bdf8; }
+            button { width: 100%; padding: 12px; background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+            button:hover { background: #0ea5e9; }
+            .error-msg { color: #f43f5e; font-size: 14px; margin-bottom: 16px; text-align: left; font-weight: 500; }
           </style>
         </head>
         <body>
           <div class="card">
             <h2>🔒 Access Denied</h2>
-            <p>To link this bot, please include your secure ADMIN_API_SECRET as a token parameter in the URL:</p>
-            <code>?token=YOUR_ADMIN_API_SECRET</code>
+            <p>Please enter your secure Admin API Secret to unlock the dashboard:</p>
+            ${hasError ? `<div class="error-msg">❌ Invalid token provided. Please try again.</div>` : ""}
+            <form method="POST" action="/login">
+              <input type="password" name="token" placeholder="Enter ADMIN_API_SECRET" required autofocus />
+              <button type="submit">Unlock Dashboard</button>
+            </form>
           </div>
         </body>
       </html>
@@ -248,71 +320,79 @@ http.createServer(async (_req, res) => {
     return;
   }
 
-  // Handle manual database purge for fresh start (users, contacts, wallets, sessions, chats)
-  if (query.action === "clear-db") {
-    try {
-      console.log("[Setup] Admin requested database purge. Clearing user data...");
-      const deletedUsers = await prisma.user.deleteMany({});
-      const deletedSessions = await prisma.sessionState.deleteMany({});
-      const deletedChats = await prisma.chatHistory.deleteMany({});
-      
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(`
-        <html>
-          <head>
-            <title>♻️ Database Cleared</title>
-            <style>
-              body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-              .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 450px; border: 1px solid #334155; }
-              h2 { color: #10b981; margin-top: 0; }
-              p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
-              .stats { background: #0f172a; padding: 15px; border-radius: 8px; font-size: 14px; text-align: left; margin: 20px 0; border: 1px solid #334155; }
-              .btn { display: inline-block; background: #38bdf8; color: #0f172a; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; margin-top: 10px; }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <h2>♻️ Database Cleared Successfully</h2>
-              <p>All user profiles, generated wallets, contacts, active sessions, and AI chat histories have been deleted.</p>
-              <div class="stats">
-                • Deleted Users (Wallets/Contacts): <b>${deletedUsers.count}</b><br/>
-                • Deleted Session States: <b>${deletedSessions.count}</b><br/>
-                • Deleted Chat Histories: <b>${deletedChats.count}</b>
-              </div>
-              <a href="?token=${ADMIN_SECRET}" class="btn">Back to Dashboard</a>
-            </div>
-          </body>
-        </html>
-      `);
-      return;
-    } catch (err: any) {
-      res.writeHead(500);
-      res.end(`Failed to clear database: ${err.message}`);
-      return;
-    }
+  // 5. Save parameter token to Cookie and Redirect to clear URL parameter (Referrer protection)
+  if (queryToken) {
+    res.writeHead(302, {
+      "Set-Cookie": `session_token=${encodeURIComponent(ADMIN_SECRET)}; Path=/; HttpOnly; SameSite=Strict`,
+      "Location": "/"
+    });
+    res.end();
+    return;
   }
 
-  // Handle manual session reset & cache purge
-  if (query.action === "reset") {
+  // 6. Handle POST actions for database purge or session reset
+  if (_req.method === "POST" && parsedUrl.pathname === "/action") {
     try {
-      console.log("[Setup] Admin requested session reset. Purging local session data...");
-      const authDir = path.join(process.cwd(), ".wwebjs_auth");
-      const cacheDir = path.join(process.cwd(), ".wwebjs_cache");
-      
-      fs.rmSync(authDir, { recursive: true, force: true });
-      fs.rmSync(cacheDir, { recursive: true, force: true });
-      
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<h2>♻️ Session purged successfully!</h2><p>The container will now restart and generate a clean QR code. Please wait 30 seconds and refresh the setup page.</p>");
-      
-      // Terminate the process with a non-zero code to force Railway to restart the container
-      setTimeout(() => {
-        process.exit(1);
-      }, 1000);
-      return;
+      const body = await getPostBody(_req);
+      const params = new URLSearchParams(body);
+      const action = params.get("action");
+
+      if (action === "clear-db") {
+        console.log("[Setup] Admin requested database purge. Clearing user data...");
+        const deletedUsers = await prisma.user.deleteMany({});
+        const deletedSessions = await prisma.sessionState.deleteMany({});
+        const deletedChats = await prisma.chatHistory.deleteMany({});
+        
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(`
+          <html>
+            <head>
+              <title>♻️ Database Cleared</title>
+              <style>
+                body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 450px; border: 1px solid #334155; }
+                h2 { color: #10b981; margin-top: 0; }
+                p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
+                .stats { background: #0f172a; padding: 15px; border-radius: 8px; font-size: 14px; text-align: left; margin: 20px 0; border: 1px solid #334155; }
+                .btn { display: inline-block; background: #38bdf8; color: #0f172a; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; margin-top: 10px; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h2>♻️ Database Cleared Successfully</h2>
+                <p>All user profiles, generated wallets, contacts, active sessions, and AI chat histories have been deleted.</p>
+                <div class="stats">
+                  • Deleted Users (Wallets/Contacts): <b>${deletedUsers.count}</b><br/>
+                  • Deleted Session States: <b>${deletedSessions.count}</b><br/>
+                  • Deleted Chat Histories: <b>${deletedChats.count}</b>
+                </div>
+                <a href="/" class="btn">Back to Dashboard</a>
+              </div>
+            </body>
+          </html>
+        `);
+        return;
+      }
+
+      if (action === "reset") {
+        console.log("[Setup] Admin requested session reset. Purging local session data...");
+        const authDir = path.join(process.cwd(), ".wwebjs_auth");
+        const cacheDir = path.join(process.cwd(), ".wwebjs_cache");
+        
+        fs.rmSync(authDir, { recursive: true, force: true });
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+        
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end("<h2>♻️ Session purged successfully!</h2><p>The container will now restart and generate a clean QR code. Please wait 30 seconds and refresh the setup page.</p>");
+        
+        setTimeout(() => {
+          process.exit(1);
+        }, 1000);
+        return;
+      }
     } catch (err: any) {
       res.writeHead(500);
-      res.end(`Failed to reset session: ${err.message}`);
+      res.end(`Failed to execute action: ${err.message}`);
       return;
     }
   }
@@ -663,8 +743,13 @@ http.createServer(async (_req, res) => {
                 <h1>Stellapp Dashboard</h1>
                 <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 14px;">Stellar WhatsApp AI Bot Administration</p>
               </div>
-              <div class="status-badge">
-                <span class="status-dot"></span> Active & Online
+              <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="status-badge">
+                  <span class="status-dot"></span> Active & Online
+                </div>
+                <form method="POST" action="/logout" style="display: inline;">
+                  <button type="submit" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">Logout</button>
+                </form>
               </div>
             </header>
             
@@ -1021,8 +1106,14 @@ http.createServer(async (_req, res) => {
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
                   <div style="display: flex; gap: 10px;">
-                    <a href="?token=${ADMIN_SECRET}&action=reset" class="btn-action btn-danger" style="flex: 1; text-align: center;" onclick="return confirm('Are you sure you want to disconnect the active WhatsApp session cache? You will need to scan a new QR code.')">♻️ Reset JID Cache</a>
-                    <a href="?token=${ADMIN_SECRET}&action=clear-db" class="btn-action btn-warning" style="flex: 1; text-align: center;" onclick="return confirm('⚠️ WARNING: This will permanently wipe all users, contacts, and transactions. Continue?')">🗑️ Wipe Database</a>
+                    <form method="POST" action="/action" style="flex: 1; display: flex;" onsubmit="return confirm('Are you sure you want to disconnect the active WhatsApp session cache? You will need to scan a new QR code.')">
+                      <input type="hidden" name="action" value="reset" />
+                      <button type="submit" class="btn-action btn-danger" style="flex: 1; text-align: center; border: none; cursor: pointer;">♻️ Reset JID Cache</button>
+                    </form>
+                    <form method="POST" action="/action" style="flex: 1; display: flex;" onsubmit="return confirm('⚠️ WARNING: This will permanently wipe all users, contacts, and transactions. Continue?')">
+                      <input type="hidden" name="action" value="clear-db" />
+                      <button type="submit" class="btn-action btn-warning" style="flex: 1; text-align: center; border: none; cursor: pointer;">🗑️ Wipe Database</button>
+                    </form>
                   </div>
                 </div>
               </div>
@@ -1135,11 +1226,10 @@ http.createServer(async (_req, res) => {
                     <p style="color:#34d399; font-size:14px; margin:0;">Enter this code on your phone:</p>
                     <div class="code-display">${pairingCode}</div>
                     <p style="color:#64748b; font-size:12px; margin:0;">Code expires in 3 minutes.</p>
-                    <button style="margin-top:15px; background:#475569;" onclick="window.location.search = '?token=${ADMIN_SECRET}'">Reset / Go Back</button>
+                    <button style="margin-top:15px; background:#475569;" onclick="window.location.href = '/'">Reset / Go Back</button>
                   </div>
                 ` : `
                   <form method="GET" style="width: 100%;">
-                    <input type="hidden" name="token" value="${ADMIN_SECRET}" />
                     <label style="display:block; font-size:13px; color:#94a3b8; margin-bottom:5px;">Phone Number (International Format)</label>
                     <input type="text" name="phone" placeholder="e.g. 919876543210" required />
                     <button type="submit">Generate Pairing Code</button>
@@ -1148,7 +1238,10 @@ http.createServer(async (_req, res) => {
               </div>
             </div>
             <div style="text-align:center; margin-top:30px;">
-              <a href="?token=${ADMIN_SECRET}&action=reset" style="color:#64748b; font-size:13px; text-decoration:none; border: 1px dashed #475569; padding: 6px 12px; border-radius: 6px; display: inline-block; transition: color 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">♻️ Stale QR or Sync Hung? Reset and Generate Fresh QR</a>
+              <form method="POST" action="/action" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect the active WhatsApp session cache? You will need to scan a new QR code.')">
+                <input type="hidden" name="action" value="reset" />
+                <button type="submit" style="background: none; border: 1px dashed #475569; padding: 6px 12px; border-radius: 6px; color:#64748b; font-size:13px; cursor: pointer; display: inline-block; transition: all 0.2s;" onmouseover="this.style.color='#f87171'; this.style.borderColor='#f87171';" onmouseout="this.style.color='#64748b'; this.style.borderColor='#475569';">♻️ Stale QR or Sync Hung? Reset and Generate Fresh QR</button>
+              </form>
             </div>
           </div>
 

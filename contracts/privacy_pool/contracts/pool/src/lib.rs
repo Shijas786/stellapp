@@ -17,10 +17,14 @@ pub enum PoolError {
     RecipientMismatch = 6,
     NotInitialized = 7,
     AmountMismatch = 8,
+    NonCanonicalFieldElement = 9,
 }
 
 mod vk;
 use vk::{VerificationKey, get_vk};
+
+#[cfg(test)]
+mod test;
 
 #[derive(Clone)]
 #[contracttype]
@@ -41,6 +45,31 @@ pub enum DataKey {
     Denomination,
 }
 
+const BLS12_381_R: [u8; 32] = [
+    0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48,
+    0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1, 0xd8, 0x05,
+    0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe,
+    0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01
+];
+
+fn is_canonical(bytes: &BytesN<32>) -> bool {
+    let mut arr = [0u8; 32];
+    bytes.copy_into_slice(&mut arr);
+    for i in 0..32 {
+        if arr[i] < BLS12_381_R[i] {
+            return true;
+        }
+        if arr[i] > BLS12_381_R[i] {
+            return false;
+        }
+    }
+    false
+}
+
+fn extend_instance_ttl(env: &Env) {
+    env.storage().instance().extend_ttl(10000, 500000);
+}
+
 #[contract]
 pub struct PrivacyPool;
 
@@ -51,19 +80,28 @@ impl PrivacyPool {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("Already initialized");
         }
+        // Prevent frontrunning by verifying the admin authorized the initialization
+        admin.require_auth();
+
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
+        extend_instance_ttl(&env);
     }
 
     /// Admin updates the current Merkle root (handled by the off-chain bot after processing a deposit)
     pub fn update_root(env: Env, new_root: BytesN<32>) {
+        if !is_canonical(&new_root) {
+            panic!("Non-canonical root");
+        }
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
         env.storage().instance().set(&DataKey::CurrentRoot, &new_root);
+        extend_instance_ttl(&env);
     }
 
     /// Get current Merkle root
     pub fn get_root(env: Env) -> BytesN<32> {
+        extend_instance_ttl(&env);
         env.storage().instance().get(&DataKey::CurrentRoot).unwrap_or(BytesN::from_array(&env, &[0; 32]))
     }
 
@@ -101,13 +139,25 @@ impl PrivacyPool {
         proof: Proof,
         root_bytes: BytesN<32>, 
         nullifier_hash_bytes: BytesN<32>, 
-        recipient_square_bytes: BytesN<32>,
+        recipient_hi: BytesN<32>,
+        recipient_lo: BytesN<32>,
         to: Address,
         amount: i128,
     ) -> Result<(), PoolError> {
+        extend_instance_ttl(&env);
+
         // 0. Verification that the pool has been initialized
         if !env.storage().instance().has(&DataKey::Admin) {
             return Err(PoolError::NotInitialized);
+        }
+
+        // Validate that all public signals represent canonical BLS12-381 field elements (strictly less than R)
+        if !is_canonical(&root_bytes) 
+            || !is_canonical(&nullifier_hash_bytes) 
+            || !is_canonical(&recipient_hi) 
+            || !is_canonical(&recipient_lo) 
+        {
+            return Err(PoolError::NonCanonicalFieldElement);
         }
 
         // 1. Check caller-supplied Merkle root against on-chain CurrentRoot (Fix 1.1)
@@ -125,33 +175,62 @@ impl PrivacyPool {
         }
 
         // 3. Check if nullifier has been used
-        if env.storage().persistent().has(&DataKey::Nullifier(nullifier_hash_bytes.clone())) {
+        let nullifier_key = DataKey::Nullifier(nullifier_hash_bytes.clone());
+        if env.storage().persistent().has(&nullifier_key) {
             return Err(PoolError::NullifierAlreadyUsed);
         }
 
-        // 4. Prevent proof hijacking: Require authorization from the recipient (Fix 1.3 part 1)
+        // 4. Verify caller-supplied recipient public signals match the 'to' address payload
+        use soroban_sdk::xdr::ToXdr;
+        let to_xdr = to.clone().to_xdr(&env);
+        let mut to_payload = [0u8; 32];
+        if to_xdr.len() == 44 {
+            to_xdr.slice(12..44).copy_into_slice(&mut to_payload);
+        } else if to_xdr.len() == 40 {
+            to_xdr.slice(8..40).copy_into_slice(&mut to_payload);
+        } else {
+            return Err(PoolError::RecipientMismatch);
+        }
+
+        let mut expected_hi = [0u8; 32];
+        let mut expected_lo = [0u8; 32];
+        for i in 0..16 {
+            expected_hi[i + 16] = to_payload[i];
+            expected_lo[i + 16] = to_payload[i + 16];
+        }
+
+        let expected_hi_n = BytesN::from_array(&env, &expected_hi);
+        let expected_lo_n = BytesN::from_array(&env, &expected_lo);
+
+        if recipient_hi != expected_hi_n || recipient_lo != expected_lo_n {
+            return Err(PoolError::RecipientMismatch);
+        }
+
+        // 5. Prevent proof hijacking: Require authorization from the recipient (Fix 1.3 part 1)
         to.require_auth();
 
-        // 5. Load Verification Key from hardcoded vk.rs
+        // 6. Load Verification Key from hardcoded vk.rs
         let vk: VerificationKey = get_vk(&env);
 
-        // 6. Prepare public signals for the SNARK
+        // 7. Prepare public signals for the SNARK
         let root_fr = Fr::from_bytes(root_bytes);
         let nullifier_hash_fr = Fr::from_bytes(nullifier_hash_bytes.clone());
-        let recipient_square_fr = Fr::from_bytes(recipient_square_bytes);
+        let recipient_hi_fr = Fr::from_bytes(recipient_hi);
+        let recipient_lo_fr = Fr::from_bytes(recipient_lo);
         
-        let pub_signals = vec![&env, root_fr, nullifier_hash_fr, recipient_square_fr];
+        let pub_signals = vec![&env, root_fr, nullifier_hash_fr, recipient_hi_fr, recipient_lo_fr];
 
-        // 7. Verify Proof
+        // 8. Verify Proof
         let is_valid = Self::verify_groth16(&env, vk, proof, pub_signals)?;
         if !is_valid {
             return Err(PoolError::InvalidProof);
         }
 
-        // 8. Mark nullifier as spent
-        env.storage().persistent().set(&DataKey::Nullifier(nullifier_hash_bytes), &true);
+        // 9. Mark nullifier as spent and extend its TTL to prevent expiration replay
+        env.storage().persistent().set(&nullifier_key, &true);
+        env.storage().persistent().extend_ttl(&nullifier_key, 10000, 500000);
 
-        // 9. Transfer funds
+        // 10. Transfer funds
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
         token_client.transfer(&env.current_contract_address(), &to, &amount);

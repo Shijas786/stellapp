@@ -430,8 +430,8 @@ function encodeG2(point: unknown, label: string): Buffer {
     }
   }
 
-  // Snarkjs g2: [ [x1, x0], [y1, y0] ]
-  // Arkworks verifier order: x.c0, x.c1, y.c0, y.c1.
+  // Snarkjs g2: [ [x1, x0], [y1, y0] ] where x0 is real and x1 is imaginary
+  // Arkworks verifier order: x.c0 (real), x.c1 (imaginary), y.c0, y.c1.
   const x0 = encodeUnsignedBigInt(
     x[1],
     48,
@@ -980,7 +980,7 @@ export async function refundEscrowContract(
 /**
  * Helper to invoke a host function on a deployed contract.
  */
-async function invokeContractMethod(
+export async function invokeContractMethod(
   secretKey: string,
   contractId: string,
   methodName: string,
@@ -1191,14 +1191,20 @@ export async function deployPrivacyPool(
   secretKey: string,
   assetCode: string = "USDC"
 ): Promise<{ contractId: string; txHash: string }> {
-  const wasmPath = path.join(
+  let wasmPath = path.join(
     process.cwd(),
-    "contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm"
+    "contracts/privacy_pool/target/wasm32v1-none/release/pool.wasm"
   );
+  if (!fs.existsSync(wasmPath)) {
+    wasmPath = path.join(
+      process.cwd(),
+      "contracts/privacy_pool/target/wasm32-unknown-unknown/release/pool.optimized.wasm"
+    );
+  }
 
   if (!fs.existsSync(wasmPath)) {
     throw new Error(
-      `Optimized WASM not found at: ${wasmPath}. Please compile and optimize it first.`
+      `Optimized WASM not found. Please compile and optimize it first.`
     );
   }
 
@@ -1291,8 +1297,8 @@ export async function withdrawFromPrivacyPool(
   validateStellarAddress(recipientAddress, "recipient address");
   const scaledAmountScVal = amountToI128ScVal(amount, "withdrawal amount");
 
-  if (!Array.isArray(publicSignals) || publicSignals.length < 3) {
-    throw new Error("At least three public signals are required.");
+  if (!Array.isArray(publicSignals) || publicSignals.length < 4) {
+    throw new Error("At least four public signals are required.");
   }
 
   if (!proof || typeof proof !== "object") {
@@ -1310,9 +1316,13 @@ export async function withdrawFromPrivacyPool(
     publicSignals[1],
     "public nullifier hash"
   );
-  const recipientSquareValue = parseUnsignedBigInt(
+  const recipientHiValue = parseUnsignedBigInt(
     publicSignals[2],
-    "public recipient square"
+    "public recipient hi"
+  );
+  const recipientLoValue = parseUnsignedBigInt(
+    publicSignals[3],
+    "public recipient lo"
   );
   const suppliedNullifierValue = parseUnsignedBigInt(
     nullifierHashStr,
@@ -1332,10 +1342,15 @@ export async function withdrawFromPrivacyPool(
     32,
     "public nullifier hash"
   );
-  const recipientSquareBuf = encodeUnsignedBigInt(
-    recipientSquareValue,
+  const recipientHiBuf = encodeUnsignedBigInt(
+    recipientHiValue,
     32,
-    "public recipient square"
+    "public recipient hi"
+  );
+  const recipientLoBuf = encodeUnsignedBigInt(
+    recipientLoValue,
+    32,
+    "public recipient lo"
   );
 
   // 2. Parse Proof to exact 96/192/96 byte buffers
@@ -1363,7 +1378,8 @@ export async function withdrawFromPrivacyPool(
     xdr.ScVal.scvMap(proofMap),
     xdr.ScVal.scvBytes(rootBuf),
     xdr.ScVal.scvBytes(nullifierHashBuf),
-    xdr.ScVal.scvBytes(recipientSquareBuf),
+    xdr.ScVal.scvBytes(recipientHiBuf),
+    xdr.ScVal.scvBytes(recipientLoBuf),
     xdr.ScVal.scvAddress(Address.fromString(recipientAddress).toScAddress()),
     scaledAmountScVal
   ]);

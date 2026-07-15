@@ -3,6 +3,7 @@ import { networkStorage } from "./network-context";
 import { swapTokens, sendStellarToken, getCurrentPriceOfXlmInUsdc, getBalances } from "./stellar";
 import { getSinglePrice } from "./price";
 import { decryptForUserWithMigration } from "./encryption";
+import { config } from "./config";
 import fs from "fs";
 import path from "path";
 
@@ -143,7 +144,7 @@ async function processSwapJobs() {
           try {
             if (finished) {
               const allHashes = updatedHashes.split(",").filter(Boolean);
-              const linksList = allHashes.map((h, i) => `• Swap #${i+1}: https://stellar.expert/explorer/testnet/tx/${h}`).join("\n");
+              const linksList = allHashes.map((h, i) => `• Swap #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
               const progressMsg = `🎉 *DCA Swap Job Completed!* \n\nSuccessfully executed all ${total} swaps of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\n🔗 *Transaction Links:* \n${linksList}`;
               await messageEditor(job.chatId, job.statusMessageId, progressMsg);
             } else {
@@ -156,7 +157,7 @@ async function processSwapJobs() {
         } else if (finished && notificationSender) {
           // Fallback if no statusMessageId exists
           const allHashes = updatedHashes.split(",").filter(Boolean);
-          const linksList = allHashes.map((h, i) => `• Swap #${i+1}: https://stellar.expert/explorer/testnet/tx/${h}`).join("\n");
+          const linksList = allHashes.map((h, i) => `• Swap #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
           const progressMsg = `🎉 *DCA Swap Job Completed!* \n\nSuccessfully executed all ${total} swaps of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\n🔗 *Transaction Links:* \n${linksList}`;
           await notificationSender(job.chatId, progressMsg);
         }
@@ -285,7 +286,7 @@ async function processTransferJobs() {
             const recipientLabel = job.recipientName || job.recipientAddr.slice(0, 8) + "...";
             if (finished) {
               const allHashes = updatedHashes.split(",").filter(Boolean);
-              const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: https://stellar.expert/explorer/testnet/tx/${h}`).join("\n");
+              const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
               const progressMsg = `🎉 *Allowance Payment Completed!* \n\nSuccessfully executed all ${total} payments of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\n🔗 *Transaction Links:* \n${linksList}`;
               await messageEditor(job.chatId, job.statusMessageId, progressMsg);
             } else {
@@ -299,7 +300,7 @@ async function processTransferJobs() {
           // Fallback if no statusMessageId exists
           const recipientLabel = job.recipientName || job.recipientAddr.slice(0, 8) + "...";
           const allHashes = updatedHashes.split(",").filter(Boolean);
-          const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: https://stellar.expert/explorer/testnet/tx/${h}`).join("\n");
+          const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
           const progressMsg = `🎉 *Allowance Payment Completed!* \n\nSuccessfully executed all ${total} payments of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\n🔗 *Transaction Links:* \n${linksList}`;
           await notificationSender(job.chatId, progressMsg);
         }
@@ -393,8 +394,7 @@ async function processLimitOrders() {
           });
 
           if (notificationSender) {
-            const readableDir = order.fromAsset === "USDC" ? "USDC → XLM" : "XLM → USDC";
-            const alertMsg = `🎉 *Limit Order Triggered & Executed!* \n\nSuccessfully swapped *${order.amount} ${order.fromAsset} → ${order.toAsset}* because the price reached *${currentPrice.toFixed(4)} USDC/XLM* (Target: ${order.condition === "LESS_THAN_OR_EQUAL" ? "<=" : ">="} ${triggerPriceNum.toFixed(4)} USDC/XLM).\n\n🔗 Transaction: https://stellar.expert/explorer/testnet/tx/${txHash}`;
+            const alertMsg = `🎉 *Limit Order Triggered & Executed!* \n\nSuccessfully swapped *${order.amount} ${order.fromAsset} → ${order.toAsset}* because the price reached *${currentPrice.toFixed(4)} USDC/XLM* (Target: ${order.condition === "LESS_THAN_OR_EQUAL" ? "<=" : ">="} ${triggerPriceNum.toFixed(4)} USDC/XLM).\n\n🔗 Transaction: ${config.explorerUrlStellar}${txHash}`;
             await notificationSender(order.chatId, alertMsg);
           }
         } catch (err: any) {

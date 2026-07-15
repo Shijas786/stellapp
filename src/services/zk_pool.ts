@@ -342,14 +342,24 @@ export async function generateWithdrawProof(
         return index;
     });
 
-    // Bind recipient using its Stellar address type and full 256-bit payload.
-    const recipientNum = await encodeRecipientAddress(recipientAddressStr);
+    // Decode the Stellar address to raw 32-byte payload and split it into hi and lo limbs
+    let payload: Buffer;
+    if (recipientAddressStr.startsWith('G')) {
+        payload = Buffer.from(StrKey.decodeEd25519PublicKey(recipientAddressStr));
+    } else if (recipientAddressStr.startsWith('C')) {
+        payload = Buffer.from(StrKey.decodeContract(recipientAddressStr));
+    } else {
+        throw new TypeError('Recipient address type is not supported');
+    }
+
+    const { hi, lo } = splitAddressPayload(payload);
     const nullifierHash = await poseidon1(canonicalNullifier);
 
     const input = {
         root: canonicalRoot,
         nullifierHash,
-        recipient: recipientNum,
+        recipient_hi: hi.toString(),
+        recipient_lo: lo.toString(),
         secret: canonicalSecret,
         nullifier: canonicalNullifier,
         pathElements: decimalPathElements,

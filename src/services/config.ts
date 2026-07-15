@@ -53,14 +53,14 @@ export const config = {
 
   get explorerUrlStellar(): string {
     return this.isMainnet 
-      ? "https://stellar.expert/explorer/public/tx/"
-      : "https://stellar.expert/explorer/testnet/tx/";
+      ? "https://stellarchain.io/tx/"
+      : "https://testnet.stellarchain.io/tx/";
   },
     
   get explorerUrlStellarContract(): string {
     return this.isMainnet
-      ? "https://stellar.expert/explorer/public/contract/"
-      : "https://stellar.expert/explorer/testnet/contract/";
+      ? "https://stellarchain.io/address/"
+      : "https://testnet.stellarchain.io/address/";
   },
 
   // Mainnet/Testnet ZK contract mappings

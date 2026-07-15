@@ -46,7 +46,8 @@ template PrivacyPool(levels) {
     // Public inputs
     signal input root;
     signal input nullifierHash;
-    signal input recipient; // Bound to the withdrawal address to prevent frontrunning
+    signal input recipient_hi; // First 128 bits of recipient address
+    signal input recipient_lo; // Second 128 bits of recipient address
     
     // Private inputs
     signal input secret;
@@ -73,10 +74,13 @@ template PrivacyPool(levels) {
     nullHasher.inputs[0] <== nullifier;
     nullifierHash === nullHasher.out;
 
-    // 4. Square the recipient to bind it to the proof (dummy constraint so it's part of R1CS)
-    signal recipientSquare;
-    recipientSquare <== recipient * recipient;
+    // 4. Square the recipient limbs to bind them to the proof (dummy constraints)
+    signal recipientHiSquare;
+    recipientHiSquare <== recipient_hi * recipient_hi;
+
+    signal recipientLoSquare;
+    recipientLoSquare <== recipient_lo * recipient_lo;
 }
 
 // 4-level tree allows up to 16 deposits (perfect for a demo)
-component main { public [root, nullifierHash, recipient] } = PrivacyPool(4);
+component main { public [root, nullifierHash, recipient_hi, recipient_lo] } = PrivacyPool(4);

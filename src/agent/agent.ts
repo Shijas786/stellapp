@@ -361,6 +361,7 @@ function isReasoningParagraph(paragraph: string): boolean {
     clean.includes("tx:") || 
     clean.includes("transaction:") || 
     clean.includes("https://stellar.expert") ||
+    clean.includes("stellarchain.io") ||
     /g[a-d2-7]{55}/.test(clean)
   ) {
     return false;

@@ -59,10 +59,7 @@ export function startLedgerWatcher() {
 
             if (botSendMessage) {
               const shortFrom = `${fromAddress.slice(0, 6)}...${fromAddress.slice(-6)}`;
-              const explorerBase = config.isMainnet
-                ? "https://stellar.expert/explorer/public/tx/"
-                : "https://stellar.expert/explorer/testnet/tx/";
-              const notificationText = `📩 *Payment Received!* \n\nYou have received *${amount} ${assetCode}* from account \`${shortFrom}\`.\n\n💰 *New Balances:* \n• XLM: ${balances.xlm}\n• USDC: ${balances.usdc}\n\n🔗 View details: ${explorerBase}${payment.transaction_hash}`;
+              const notificationText = `📩 *Payment Received!* \n\nYou have received *${amount} ${assetCode}* from account \`${shortFrom}\`.\n\n💰 *New Balances:* \n• XLM: ${balances.xlm}\n• USDC: ${balances.usdc}\n\n🔗 View details: ${config.explorerUrlStellar}${payment.transaction_hash}`;
               
               await botSendMessage(recipientUser.chatId, notificationText);
             }

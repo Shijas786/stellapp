@@ -29,7 +29,6 @@ function g2ToRust(arr) {
     // Wait, the arkworks serialization for Fq2 is c0 then c1.
     // Snarkjs uses [x_real, x_imaginary]. In Ethereum/Snarkjs, G2 is x = x0 + x1 * u. Snarkjs outputs [x1, x0].
     // Let's assume arkworks expects c0 then c1. So we reverse them: [x0, x1].
-    // Let's just try to output the 192 bytes. We'll output x_c0, x_c1, y_c0, y_c1.
     // Snarkjs: arr[0][0] is x_c1, arr[0][1] is x_c0. (SnarkJS format is swapped compared to Zcash/Arkworks).
     // Let's swap them.
     const x1 = hexToBytes(arr[0][0], 48); // x_c1
