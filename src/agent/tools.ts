@@ -59,6 +59,17 @@ async function clearPendingAction(chatId: string): Promise<void> {
     if (record) {
       let state = JSON.parse(record.stateJson);
       delete state._pending_action;
+
+      // Track the consumed user confirmation message count to prevent reuse
+      const chatRecord = await prisma.chatHistory.findUnique({ where: { chatId } });
+      if (chatRecord) {
+        const messages = JSON.parse(chatRecord.messages);
+        const userMessages = messages.filter((m: any) => m.role === "user");
+        if (userMessages.length > 0) {
+          state.lastConsumedUserMsgCount = userMessages.length;
+        }
+      }
+
       await prisma.sessionState.update({
         where: { chatId },
         data: { stateJson: JSON.stringify(state) }
@@ -95,6 +106,15 @@ async function isLatestMessageConfirmation(chatId: string): Promise<boolean> {
       const messages = JSON.parse(record.messages);
       const userMessages = messages.filter((m: any) => m.role === "user");
       if (userMessages.length > 0) {
+        // Check if the latest user message confirmation was already consumed/processed
+        const sessionRecord = await prisma.sessionState.findUnique({ where: { chatId } });
+        if (sessionRecord) {
+          const state = JSON.parse(sessionRecord.stateJson);
+          if (state.lastConsumedUserMsgCount === userMessages.length) {
+            return false;
+          }
+        }
+
         const lastMsg = userMessages[userMessages.length - 1].content.toLowerCase().trim();
 
         // 1. Exact whole-message match for short/loose terms (preventing substring/word fragment matching)
@@ -1042,10 +1062,12 @@ export async function executeTool(
         pending.args.amount === args.amount &&
         pending.args.asset === args.asset;
 
-      if (!pending || !argsMatch || !isConfirmed) {
+      const canExecute = isConfirmed && pending && pending.name === "send_stellar" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "send_stellar", {
-          recipient: args.recipient, // original human-readable name/phone
-          resolvedAddr: recipient,   // resolved G address — used by intent-router confirm handler
+          recipient: args.recipient,
+          resolvedAddr: recipient,
           amount: args.amount,
           asset: args.asset
         });
@@ -1143,7 +1165,9 @@ export async function executeTool(
         swapPending.args.amount === args.amount &&
         swapPending.args.direction === args.direction;
 
-      if (!swapPending || !swapArgsMatch || !swapConfirmed) {
+      const canExecute = swapConfirmed && swapPending && swapPending.name === "swap_stellar" && swapArgsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "swap_stellar", args);
         const readableDir = args.direction === "XLM_TO_USDC" ? "XLM → USDC" : "USDC → XLM";
         return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm they want to swap ${args.amount} ${readableDir}. Instruct them to reply 'yes' or 'confirm' to execute this swap.`;
@@ -1181,7 +1205,9 @@ export async function executeTool(
         pending.args.toAsset === args.toAsset &&
         pending.args.totalSwaps === args.totalSwaps;
 
-      if (!pending || !argsMatch || !confirmed) {
+      const canExecute = confirmed && pending && pending.name === "schedule_recurring_swap" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "schedule_recurring_swap", {
           ...args,
           intervalSeconds: intervalSeconds.toString()
@@ -1317,7 +1343,9 @@ export async function executeTool(
         pending.args.assetCode === args.assetCode &&
         pending.args.totalTransfers === args.totalTransfers;
 
-      if (!pending || !argsMatch || !confirmed) {
+      const canExecute = confirmed && pending && pending.name === "schedule_recurring_transfer" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "schedule_recurring_transfer", {
           ...args,
           intervalSeconds: intervalSeconds.toString()
@@ -1391,10 +1419,9 @@ export async function executeTool(
         pending.args.contractType === args.contractType &&
         (args.contractType !== "custom" || pending.args.customDescription === args.customDescription);
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This contract deployment has already been initiated or processed. No duplicate deployment was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "deploy_custom_contract" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "deploy_custom_contract", args);
         const actionDesc = args.contractType === "custom" 
           ? `deploy a custom smart contract: "${args.customDescription}"`
@@ -1658,10 +1685,9 @@ ${rustCode}
       const argsMatch = pending && pending.name === "deploy_privacy_pool" &&
         pending.args.assetCode === assetCode;
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This contract deployment has already been initiated or processed. No duplicate deployment was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "deploy_privacy_pool" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "deploy_privacy_pool", { assetCode });
         return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm that they want to deploy a new ZK Privacy Pool for ${assetCode}. Explain that this instantiates a new contract on the network and costs fees. Instruct them to reply 'yes' or 'confirm' to execute this deployment.`;
       }
@@ -1784,10 +1810,9 @@ ${rustCode}
         pending.args.amount === args.amount &&
         pending.args.assetCode === assetCode;
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This privacy pool deposit has already been initiated or processed. No duplicate deposit was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "deposit_private_pool" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "deposit_private_pool", {
           amount: args.amount,
           assetCode
@@ -1989,17 +2014,15 @@ ${rustCode}
         pending.args.secretNote === args.secretNote &&
         pending.args.recipient === args.recipient;
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This privacy pool withdrawal has already been initiated or processed. No duplicate withdrawal was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "withdraw_private_pool" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "withdraw_private_pool", {
           secretNote: args.secretNote,
           recipient: args.recipient,
           resolvedAddr: recipient
         });
-        const recipientLabel = args.recipient ? `to ${args.recipient} (Address: ${recipient})` : "to your wallet";
-        return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm that they want to withdraw their ZK Secret Note of ${amountStr} ${depositRecord.assetCode} ${recipientLabel}. Instruct them to reply 'yes' or 'confirm' to execute this withdrawal.`;
+        return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm that they want to withdraw from the ZK Privacy Pool. Instruct them to reply 'yes' or 'confirm' to execute this withdrawal.`;
       }
 
       // Clear pending action upon approval
@@ -2280,10 +2303,9 @@ ${rustCode}
         pending.args.amount === args.amount &&
         pending.args.asset === assetCode;
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This confidential transfer has already been initiated or processed. No duplicate transfer was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "confidential_transfer" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "confidential_transfer", {
           recipient: args.recipient,
           resolvedAddr: recipient,
@@ -2339,10 +2361,9 @@ ${rustCode}
         pending.args.amount === args.amount &&
         pending.args.asset === assetCode;
 
-      if (!pending || !argsMatch) {
-        if (isConfirmed) {
-          return "TRANSACTION_ALREADY_PROCESSED: This confidential withdrawal has already been initiated or processed. No duplicate withdrawal was triggered.";
-        }
+      const canExecute = isConfirmed && pending && pending.name === "confidential_withdraw" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "confidential_withdraw", {
           recipient,
           amount: args.amount,
@@ -2431,7 +2452,9 @@ ${rustCode}
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "export_wallet";
 
-      if (!pending || !argsMatch || !isConfirmed) {
+      const canExecute = isConfirmed && pending && pending.name === "export_wallet" && argsMatch;
+
+      if (!canExecute) {
         await savePendingAction(chatId, "export_wallet", {});
         return `CONFIRMATION_REQUIRED: You must warn the user about the security risk of displaying their private key in chat, and ask them to explicitly confirm by replying 'yes' or 'confirm' to view it.`;
       }

@@ -51,7 +51,7 @@ WORKDIR /app
 
 # Create auth directories
 RUN mkdir -p .wwebjs_auth /tmp/chromium-cache && \
-    chmod -R 777 .wwebjs_auth /tmp/chromium-cache
+    chmod -R 700 .wwebjs_auth /tmp/chromium-cache
 
 # ============================================
 # Build Application
@@ -94,4 +94,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-CMD ["sh", "-c", "node scripts/setup-db-provider.js && npx prisma db push --accept-data-loss && node dist/index.js"]
+CMD ["sh", "-c", "node scripts/setup-db-provider.js && npx prisma db push && node dist/index.js"]

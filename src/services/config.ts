@@ -11,7 +11,7 @@ export const config = {
     return process.env.STELLAR_NETWORK === "MAINNET";
   },
   
-  openaiModel: process.env.OPENAI_MODEL || "gpt-5.6-sol",
+  openaiModel: process.env.OPENAI_MINI_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna",
   openaiMiniModel: process.env.OPENAI_MINI_MODEL || "gpt-5.6-luna",
   openaiVectorStoreId: process.env.OPENAI_VECTOR_STORE_ID || "",
   
