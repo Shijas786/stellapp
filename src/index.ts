@@ -121,6 +121,15 @@ http.createServer(async (_req, res) => {
     return;
   }
 
+  // 2.5 Health Check Endpoint
+  if (parsedUrl.pathname === "/health") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("OK");
+    return;
+  }
+
+
+
 
 
 
@@ -219,100 +228,82 @@ http.createServer(async (_req, res) => {
     }
   }
 
-
-
-  // Helper to parse cookies safely
-  const cookiesHeader = _req.headers.cookie || "";
-  let sessionToken = "";
-  const cookieMatch = cookiesHeader.match(/session_token=([^;]+)/);
-  if (cookieMatch) {
-    sessionToken = decodeURIComponent(cookieMatch[1]);
+  // 3. Redirect root / to Next.js basePath landing page /dashboard
+  if (parsedUrl.pathname === "/" && !query.token) {
+    res.writeHead(302, { Location: "/dashboard" });
+    res.end();
+    return;
   }
 
-  // Helper to read POST body
-  const getPostBody = (req: http.IncomingMessage): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      let body = "";
-      req.on("data", chunk => { body += chunk.toString(); });
-      req.on("end", () => resolve(body));
-      req.on("error", err => reject(err));
-    });
-  };
+  // 3.5 Serve Next.js App Router (pages and assets mounted under /dashboard basePath)
+  if (parsedUrl.pathname?.startsWith("/dashboard")) {
+    let subpath = parsedUrl.pathname.substring("/dashboard".length);
+    let cleanSubpath = subpath.replace(/\/$/, "");
+    if (cleanSubpath === "") cleanSubpath = "/index";
 
-  // 1. Handle POST-based login
-  if (_req.method === "POST" && parsedUrl.pathname === "/login") {
-    try {
-      const body = await getPostBody(_req);
-      const params = new URLSearchParams(body);
-      const postToken = params.get("token") || "";
-
-      if (ADMIN_SECRET.length > 0 && postToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(postToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
-        res.writeHead(302, {
-          "Set-Cookie": `session_token=${encodeURIComponent(ADMIN_SECRET)}; Path=/; HttpOnly; SameSite=Strict`,
-          "Location": "/"
+    // 3.6 Check for static HTML pages in Next.js export
+    const pagePaths = ["/index", "/login", "/roadmap", "/dashboard"];
+    if (pagePaths.includes(cleanSubpath) && !query.token) {
+      const pagePath = path.join(process.cwd(), "dashboard", "out", `${cleanSubpath.substring(1)}.html`);
+      if (fs.existsSync(pagePath)) {
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
         });
-        res.end();
+        res.end(fs.readFileSync(pagePath));
         return;
       }
-    } catch (e) {
-      console.error("Login parsing error:", e);
     }
-    res.writeHead(302, { "Location": "/?error=invalid_token" });
-    res.end();
-    return;
-  }
 
-  // 2. Handle POST-based logout
-  if (_req.method === "POST" && parsedUrl.pathname === "/logout") {
-    res.writeHead(302, {
-      "Set-Cookie": "session_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
-      "Location": "/"
-    });
-    res.end();
-    return;
-  }
+    // 3.7 Check for static assets (chunks, files, media, styles) in Next.js export
+    const assetPath = path.join(process.cwd(), "dashboard", "out", subpath);
+    if (fs.existsSync(assetPath) && !fs.lstatSync(assetPath).isDirectory()) {
+      const ext = path.extname(assetPath);
+      let contentType = "application/octet-stream";
+      if (ext === ".css") contentType = "text/css";
+      else if (ext === ".js") contentType = "application/javascript";
+      else if (ext === ".png") contentType = "image/png";
+      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+      else if (ext === ".svg") contentType = "image/svg+xml";
+      else if (ext === ".webm") contentType = "video/webm";
+      else if (ext === ".json") contentType = "application/json";
+      else if (ext === ".txt") contentType = "text/plain";
 
-  // 3. Verify access authorization (timing-safe verification)
-  let isAuthorized = false;
-  const queryToken = typeof query.token === "string" ? query.token : "";
+      // Hashed Next.js chunks can be cached permanently (immutable)
+      let cacheControl = "public, max-age=3600";
+      if (subpath.includes("/_next/static/")) {
+        cacheControl = "public, max-age=31536000, immutable";
+      }
 
-  if (ADMIN_SECRET.length > 0) {
-    if (queryToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(queryToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
-      isAuthorized = true;
-    } else if (sessionToken.length === ADMIN_SECRET.length && crypto.timingSafeEqual(Buffer.from(sessionToken, "utf8"), Buffer.from(ADMIN_SECRET, "utf8"))) {
-      isAuthorized = true;
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": cacheControl
+      });
+      res.end(fs.readFileSync(assetPath));
+      return;
     }
   }
 
-  // 4. Render login page if not authorized
-  if (!isAuthorized) {
+  // Require token verification to access the dashboard/setup page
+  if (query.token !== ADMIN_SECRET) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
-    const hasError = query.error === "invalid_token";
     res.end(`
       <html>
         <head>
           <title>🔒 Administration Panel Locked</title>
           <style>
             body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 420px; border: 1px solid #334155; width: 100%; box-sizing: border-box; }
+            .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 420px; border: 1px solid #334155; }
             h2 { color: #f43f5e; margin-top: 0; }
-            p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
-            input[type="password"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; font-size: 16px; margin-bottom: 16px; box-sizing: border-box; }
-            input[type="password"]:focus { outline: none; border-color: #38bdf8; }
-            button { width: 100%; padding: 12px; background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer; transition: background 0.2s; }
-            button:hover { background: #0ea5e9; }
-            .error-msg { color: #f43f5e; font-size: 14px; margin-bottom: 16px; text-align: left; font-weight: 500; }
+            p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
+            code { display: block; background: #0f172a; padding: 12px; border-radius: 8px; font-size: 14px; color: #38bdf8; margin-top: 20px; font-family: monospace; border: 1px solid #1e293b; }
           </style>
         </head>
         <body>
           <div class="card">
             <h2>🔒 Access Denied</h2>
-            <p>Please enter your secure Admin API Secret to unlock the dashboard:</p>
-            ${hasError ? `<div class="error-msg">❌ Invalid token provided. Please try again.</div>` : ""}
-            <form method="POST" action="/login">
-              <input type="password" name="token" placeholder="Enter ADMIN_API_SECRET" required autofocus />
-              <button type="submit">Unlock Dashboard</button>
-            </form>
+            <p>To link this bot, please include your secure ADMIN_API_SECRET as a token parameter in the URL:</p>
+            <code>?token=YOUR_ADMIN_API_SECRET</code>
           </div>
         </body>
       </html>
@@ -320,62 +311,54 @@ http.createServer(async (_req, res) => {
     return;
   }
 
-  // 5. Save parameter token to Cookie and Redirect to clear URL parameter (Referrer protection)
-  if (queryToken) {
-    res.writeHead(302, {
-      "Set-Cookie": `session_token=${encodeURIComponent(ADMIN_SECRET)}; Path=/; HttpOnly; SameSite=Strict`,
-      "Location": "/"
-    });
-    res.end();
-    return;
+  // Handle manual database purge for fresh start (users, contacts, wallets, sessions, chats)
+  if (query.action === "clear-db") {
+    try {
+      console.log("[Setup] Admin requested database purge. Clearing user data...");
+      const deletedUsers = await prisma.user.deleteMany({});
+      const deletedSessions = await prisma.sessionState.deleteMany({});
+      const deletedChats = await prisma.chatHistory.deleteMany({});
+      
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(`
+        <html>
+          <head>
+            <title>♻️ Database Cleared</title>
+            <style>
+              body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+              .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 450px; border: 1px solid #334155; }
+              h2 { color: #10b981; margin-top: 0; }
+              p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
+              .stats { background: #0f172a; padding: 15px; border-radius: 8px; font-size: 14px; text-align: left; margin: 20px 0; border: 1px solid #334155; }
+              .btn { display: inline-block; background: #38bdf8; color: #0f172a; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; margin-top: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>♻️ Database Cleared Successfully</h2>
+              <p>All user profiles, generated wallets, contacts, active sessions, and AI chat histories have been deleted.</p>
+              <div class="stats">
+                • Deleted Users (Wallets/Contacts): <b>${deletedUsers.count}</b><br/>
+                • Deleted Session States: <b>${deletedSessions.count}</b><br/>
+                • Deleted Chat Histories: <b>${deletedChats.count}</b>
+              </div>
+              <a href="?token=${ADMIN_SECRET}" class="btn">Back to Dashboard</a>
+            </div>
+          </body>
+        </html>
+      `);
+      return;
+    } catch (err: any) {
+      res.writeHead(500);
+      res.end(`Failed to clear database: ${err.message}`);
+      return;
+    }
   }
 
-  // 6. Handle POST actions for database purge or session reset
-  if (_req.method === "POST" && parsedUrl.pathname === "/action") {
+  // Handle manual session reset to clear browser session lock issues
+  if (query.action === "reset") {
     try {
-      const body = await getPostBody(_req);
-      const params = new URLSearchParams(body);
-      const action = params.get("action");
-
-      if (action === "clear-db") {
-        console.log("[Setup] Admin requested database purge. Clearing user data...");
-        const deletedUsers = await prisma.user.deleteMany({});
-        const deletedSessions = await prisma.sessionState.deleteMany({});
-        const deletedChats = await prisma.chatHistory.deleteMany({});
-        
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(`
-          <html>
-            <head>
-              <title>♻️ Database Cleared</title>
-              <style>
-                body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                .card { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); text-align: center; max-width: 450px; border: 1px solid #334155; }
-                h2 { color: #10b981; margin-top: 0; }
-                p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
-                .stats { background: #0f172a; padding: 15px; border-radius: 8px; font-size: 14px; text-align: left; margin: 20px 0; border: 1px solid #334155; }
-                .btn { display: inline-block; background: #38bdf8; color: #0f172a; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; margin-top: 10px; }
-              </style>
-            </head>
-            <body>
-              <div class="card">
-                <h2>♻️ Database Cleared Successfully</h2>
-                <p>All user profiles, generated wallets, contacts, active sessions, and AI chat histories have been deleted.</p>
-                <div class="stats">
-                  • Deleted Users (Wallets/Contacts): <b>${deletedUsers.count}</b><br/>
-                  • Deleted Session States: <b>${deletedSessions.count}</b><br/>
-                  • Deleted Chat Histories: <b>${deletedChats.count}</b>
-                </div>
-                <a href="/" class="btn">Back to Dashboard</a>
-              </div>
-            </body>
-          </html>
-        `);
-        return;
-      }
-
-      if (action === "reset") {
-        console.log("[Setup] Admin requested session reset. Purging local session data...");
+      console.log("[Setup] Admin requested session reset. Purging local session data...");
         const authDir = path.join(process.cwd(), ".wwebjs_auth");
         const cacheDir = path.join(process.cwd(), ".wwebjs_cache");
         
@@ -389,7 +372,6 @@ http.createServer(async (_req, res) => {
           process.exit(1);
         }, 1000);
         return;
-      }
     } catch (err: any) {
       res.writeHead(500);
       res.end(`Failed to execute action: ${err.message}`);
@@ -1223,7 +1205,7 @@ http.createServer(async (_req, res) => {
                     <p style="color:#34d399; font-size:14px; margin:0;">Enter this code on your phone:</p>
                     <div class="code-display">${pairingCode}</div>
                     <p style="color:#64748b; font-size:12px; margin:0;">Code expires in 3 minutes.</p>
-                    <button style="margin-top:15px; background:#475569;" onclick="window.location.href = '/'">Reset / Go Back</button>
+                    <button style="margin-top:15px; background:#475569;" onclick="window.location.href = '/dashboard'">Reset / Go Back</button>
                   </div>
                 ` : `
                   <form method="GET" style="width: 100%;">

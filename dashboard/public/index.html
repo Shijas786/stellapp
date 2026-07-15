@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <!-- Import Maps for PixelBlast Dependencies -->
     <script type="importmap">
         {
@@ -49,7 +49,7 @@
             <a href="#products" class="nav-text-link">Products</a>
             <a href="/roadmap.html" class="nav-text-link">Roadmap</a>
             <div class="magnetic-wrap">
-                <a href="/dashboard" class="nav-btn glass-btn" style="background: rgba(129, 199, 132, 0.1); border-color: rgba(129, 199, 132, 0.3); color: #81C784;">Login to Dashboard</a>
+                <a href="http://localhost:3000" target="_blank" class="nav-btn glass-btn" style="background: rgba(129, 199, 132, 0.1); border-color: rgba(129, 199, 132, 0.3); color: #81C784;">Login to Dashboard</a>
             </div>
             <div class="magnetic-wrap">
                 <a href="#connect" class="nav-btn glass-btn">Connect WhatsApp</a>
@@ -57,14 +57,14 @@
         </div>
     </nav>
 
-    <header class="hero">
+    <header class="section hero">
         <div class="hero-content">
             <div class="badge glass">💬 Web3 on WhatsApp</div>
-            <h1>Chat. Build. Pay.<br/>On <span class="text-gradient" style="background: linear-gradient(90deg, #81C784 0%, #2E7D32 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Stellar.</span></h1>
-            <p>Send, receive, swap, deploy contracts and more — all on Stellar, all inside WhatsApp.</p>
+            <h1>Send, Receive, Deploy on <br/><span class="text-gradient" style="background: linear-gradient(90deg, #81C784 0%, #2E7D32 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">WhatsApp</span></h1>
+            <p>Harness the speed of the Stellar network right from your chats. Move money instantly, trade tokens, and launch smart contracts using just a text message.</p>
             <div class="cta-group" style="display: flex; gap: 20px; align-items: center; justify-content: center;">
-                <a href="https://wa.me/917012751478?text=create%20wallet" target="_blank" class="primary-btn" style="background: var(--accent-1); color: var(--bg-color); font-weight: 700; border-radius: 30px; padding: 15px 30px; text-decoration: none;">Create my free account →</a>
-                <a href="/dashboard" class="secondary-btn glass" style="border-radius: 30px; padding: 15px 30px; text-decoration: none;">Open Dashboard</a>
+                <a href="#connect" class="primary-btn" style="background: var(--accent-1); color: var(--bg-color); font-weight: 700; border-radius: 30px; padding: 15px 30px;">Start Chatting</a>
+                <a href="http://localhost:3000" class="secondary-btn glass" style="border-radius: 30px; padding: 15px 30px;">Open Dashboard</a>
             </div>
         </div>
         
@@ -123,7 +123,12 @@
         </div>
     </header>
 
-    <section id="features" class="bento-features">
+    <section id="features" class="section bento-features" style="position: relative;">
+        <div class="features-bg">
+            <div class="features-orb orb-1"></div>
+            <div class="features-orb orb-2"></div>
+            <div class="features-orb orb-3"></div>
+        </div>
         <div class="bento-header">
             <h2>With Stellapp, crypto is <span class="highlight">simple.</span></h2>
         </div>
@@ -188,7 +193,7 @@
 
 
     <!-- FAQ Section -->
-    <section id="faq" class="faq-section">
+    <section id="faq" class="section faq-section">
         <h2 class="faq-title">Frequently Asked Questions</h2>
         <div class="faq-container">
             <div class="faq-item">
@@ -198,15 +203,6 @@
                 </button>
                 <div class="faq-answer">
                     <p>Yes. Stellapp provides a secure, fully-managed custodial wallet. We handle all the complex key management on our enterprise-grade backend. WhatsApp acts as a fast, authenticated channel to communicate your intents to our AI, executing your transactions safely and instantly.</p>
-                </div>
-            </div>
-            <div class="faq-item">
-                <button class="faq-question">
-                    How does the ZK Privacy Pool work on WhatsApp?
-                    <span class="faq-icon">+</span>
-                </button>
-                <div class="faq-answer">
-                    <p>To deliver a seamless mobile experience without requiring you to run heavy cryptographic proof computations on your phone, Stellapp utilizes a ZK Relayer Architecture. The ZK proof (Groth16/BLS12-381) is calculated by our server on behalf of the user when they submit their secret note. The proof is then verified 100% on-chain by the Soroban smart contract to process the private withdrawal securely.</p>
                 </div>
             </div>
             <div class="faq-item">
@@ -282,7 +278,7 @@
 
     <!-- Initialize PixelBlast -->
     <script type="module">
-        import { initPixelBlast } from '/assets/PixelBlast.js?v=2';
+        import { initPixelBlast } from '/PixelBlast.js?v=2';
 
         // Wait for DOM
         document.addEventListener('DOMContentLoaded', () => {
@@ -314,6 +310,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-    <script src="/assets/animations.js"></script>
+    <script src="/animations.js"></script>
 </body>
 </html>
