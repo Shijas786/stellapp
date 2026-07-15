@@ -1720,6 +1720,21 @@ ${rustCode}
 
     case "deploy_privacy_pool": {
       const assetCode = (args.assetCode || "USDC").toUpperCase();
+
+      // Enforce Confirmation Gate
+      const pending = await getPendingAction(chatId);
+      const isConfirmed = await isLatestMessageConfirmation(chatId);
+      const argsMatch = pending && pending.name === "deploy_privacy_pool" &&
+        pending.args.assetCode === assetCode;
+
+      if (!pending || !argsMatch) {
+        if (isConfirmed) {
+          return "TRANSACTION_ALREADY_PROCESSED: This contract deployment has already been initiated or processed. No duplicate deployment was triggered.";
+        }
+        await savePendingAction(chatId, "deploy_privacy_pool", { assetCode });
+        return `CONFIRMATION_REQUIRED: You must ask the user to explicitly confirm that they want to deploy a new ZK Privacy Pool for ${assetCode}. Explain that this instantiates a new contract on the network and costs fees. Instruct them to reply 'yes' or 'confirm' to execute this deployment.`;
+      }
+
       await sendNotification(chatId, `⏳ *Deploying ZK Privacy Pool for ${assetCode}...*\n\nThis involves deploying the Zero-Knowledge verifier and the privacy pool to the Stellar network. It usually takes 30-45 seconds. Please wait!`);
       const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const { contractId, txHash } = await stellar.deployPrivacyPool(stellarSecret, assetCode);
@@ -1757,15 +1772,18 @@ ${rustCode}
       
       // Auto-lookup logic if no valid contractId is specified
       if (!poolContractId || poolContractId.startsWith("C...") || poolContractId.length < 10) {
-        // Fallback to official default pool contracts
-        if (assetCode === "USDC") {
-          poolContractId = "CBNWI5VVLB5ISMXKYS2HBARIJAVR35ACZMQM6TQMMTU3AGMVRV5ZC7QL";
-          console.log(`[ZK Pool] Routed deposit to official default USDC pool: ${poolContractId}`);
-        } else if (assetCode === "XLM") {
-          poolContractId = "CAGPVMYFTDPLUOMEGCQYC4AMN5OGWN4DZ46S65EHQEUVS5EEHVWXMP6V";
-          console.log(`[ZK Pool] Routed deposit to official default XLM pool: ${poolContractId}`);
-        } else {
-          // A. Check session state
+        
+        // 0. Use the authoritative production fallback pools if configured
+        if (assetCode === "USDC" && process.env.DEFAULT_USDC_POOL) {
+          poolContractId = process.env.DEFAULT_USDC_POOL;
+          console.log(`[ZK Pool] Routed deposit to authoritative env USDC pool: ${poolContractId}`);
+        } else if (assetCode === "XLM" && process.env.DEFAULT_XLM_POOL) {
+          poolContractId = process.env.DEFAULT_XLM_POOL;
+          console.log(`[ZK Pool] Routed deposit to authoritative env XLM pool: ${poolContractId}`);
+        }
+        
+        // A. Check current user's session state for their recently deployed pool
+        if (!poolContractId) {
           try {
             const record = await prisma.sessionState.findUnique({ where: { chatId } });
             if (record) {
@@ -1776,34 +1794,51 @@ ${rustCode}
               }
             }
           } catch {}
+        }
 
-          // B. Check past deposits
-          if (!poolContractId) {
-            try {
-              const latestDeposit = await prisma.privacyDeposit.findFirst({
-                where: { ownerId: user.id, assetCode },
-                orderBy: { createdAt: "desc" }
-              });
-              if (latestDeposit) {
-                poolContractId = latestDeposit.contractId;
-                console.log(`[ZK Pool] Auto-resolved pool contract ID from past deposits: ${poolContractId}`);
-              }
-            } catch {}
-          }
+        // B. Check past deposits from this user
+        if (!poolContractId) {
+          try {
+            const latestDeposit = await prisma.privacyDeposit.findFirst({
+              where: { ownerId: user.id, assetCode },
+              orderBy: { createdAt: "desc" }
+            });
+            if (latestDeposit) {
+              poolContractId = latestDeposit.contractId;
+              console.log(`[ZK Pool] Auto-resolved pool contract ID from past deposits: ${poolContractId}`);
+            }
+          } catch {}
+        }
 
-          // C. Check if ANY user in the system has deployed a pool for this asset (shared public pool model)
-          if (!poolContractId) {
-            try {
-              const anyDeposit = await prisma.privacyDeposit.findFirst({
-                where: { assetCode },
-                orderBy: { createdAt: "desc" }
-              });
-              if (anyDeposit) {
-                poolContractId = anyDeposit.contractId;
-                console.log(`[ZK Pool] Auto-resolved pool contract ID from global system history: ${poolContractId}`);
+        // C. Check if ANY user in the system has deployed a pool for this asset globally in their session
+        if (!poolContractId) {
+          try {
+            const anySession = await prisma.sessionState.findFirst({
+              where: { stateJson: { contains: `"latest_pool_${assetCode}"` } },
+              orderBy: { updatedAt: "desc" }
+            });
+            if (anySession) {
+              const state = JSON.parse(anySession.stateJson);
+              if (state[`latest_pool_${assetCode}`]) {
+                poolContractId = state[`latest_pool_${assetCode}`];
+                console.log(`[ZK Pool] Auto-resolved pool contract ID from global sessions: ${poolContractId}`);
               }
-            } catch {}
-          }
+            }
+          } catch {}
+        }
+
+        // D. Check global deposits
+        if (!poolContractId) {
+          try {
+            const anyDeposit = await prisma.privacyDeposit.findFirst({
+              where: { assetCode },
+              orderBy: { createdAt: "desc" }
+            });
+            if (anyDeposit) {
+              poolContractId = anyDeposit.contractId;
+              console.log(`[ZK Pool] Auto-resolved pool contract ID from global system history: ${poolContractId}`);
+            }
+          } catch {}
         }
       }
 
