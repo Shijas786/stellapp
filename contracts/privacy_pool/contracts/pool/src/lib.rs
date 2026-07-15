@@ -13,6 +13,10 @@ pub enum PoolError {
     InvalidProof = 2,
     NullifierAlreadyUsed = 3,
     InvalidDeposit = 4,
+    RootMismatch = 5,
+    RecipientMismatch = 6,
+    NotInitialized = 7,
+    AmountMismatch = 8,
 }
 
 mod vk;
@@ -34,6 +38,7 @@ pub enum DataKey {
     VK,
     CurrentRoot,
     Nullifier(BytesN<32>),
+    Denomination,
 }
 
 #[contract]
@@ -43,6 +48,9 @@ pub struct PrivacyPool;
 impl PrivacyPool {
     /// Initialize the privacy pool with the USDC token address and the Verifying Key
     pub fn initialize(env: Env, admin: Address, token: Address) {
+        if env.storage().instance().has(&DataKey::Admin) {
+            panic!("Already initialized");
+        }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
     }
@@ -60,18 +68,31 @@ impl PrivacyPool {
     }
 
     /// User deposits USDC into the pool (adds commitment)
-    pub fn deposit(env: Env, from: Address, amount: i128, _commitment: BytesN<32>) {
+    pub fn deposit(env: Env, from: Address, amount: i128, commitment: BytesN<32>) {
         from.require_auth();
         
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
+
+        // Fixed Denomination logic: Lock pool to the amount of the first deposit (Fix 1.2 part 1)
+        let denomination_key = DataKey::Denomination;
+        let denomination: i128 = if env.storage().instance().has(&denomination_key) {
+            env.storage().instance().get(&denomination_key).unwrap()
+        } else {
+            env.storage().instance().set(&denomination_key, &amount);
+            amount
+        };
+
+        if amount != denomination {
+            panic!("Amount must match pool denomination");
+        }
         
         token_client.transfer(&from, &env.current_contract_address(), &amount);
         
         // In a fully trustless on-chain setup, the contract would update the Merkle tree here.
         // For the hackathon demo, the off-chain bot updates the tree and calls update_root.
         // We emit an event so the bot knows a deposit happened.
-        env.events().publish((Symbol::new(&env, "deposit"),), _commitment);
+        env.events().publish((Symbol::new(&env, "deposit"),), commitment);
     }
 
     /// User withdraws USDC privately using a ZK proof
@@ -84,31 +105,53 @@ impl PrivacyPool {
         to: Address,
         amount: i128,
     ) -> Result<(), PoolError> {
-        // 1. Check if nullifier has been used
+        // 0. Verification that the pool has been initialized
+        if !env.storage().instance().has(&DataKey::Admin) {
+            return Err(PoolError::NotInitialized);
+        }
+
+        // 1. Check caller-supplied Merkle root against on-chain CurrentRoot (Fix 1.1)
+        let current_root: BytesN<32> = env.storage().instance().get(&DataKey::CurrentRoot)
+            .ok_or(PoolError::RootMismatch)?;
+        if root_bytes != current_root {
+            return Err(PoolError::RootMismatch);
+        }
+
+        // 2. Enforce pool denomination constraint (Fix 1.2 part 2)
+        let denomination: i128 = env.storage().instance().get(&DataKey::Denomination)
+            .ok_or(PoolError::NotInitialized)?;
+        if amount != denomination {
+            return Err(PoolError::AmountMismatch);
+        }
+
+        // 3. Check if nullifier has been used
         if env.storage().persistent().has(&DataKey::Nullifier(nullifier_hash_bytes.clone())) {
             return Err(PoolError::NullifierAlreadyUsed);
         }
 
-        // 2. Load Verification Key from hardcoded vk.rs
+        // 4. Prevent proof hijacking: Require authorization from the recipient (Fix 1.3 part 1)
+        to.require_auth();
+
+        // 5. Load Verification Key from hardcoded vk.rs
         let vk: VerificationKey = get_vk(&env);
 
-        // 3. Prepare public signals for the SNARK
+        // 6. Prepare public signals for the SNARK
         let root_fr = Fr::from_bytes(root_bytes);
         let nullifier_hash_fr = Fr::from_bytes(nullifier_hash_bytes.clone());
         let recipient_square_fr = Fr::from_bytes(recipient_square_bytes);
         
         let pub_signals = vec![&env, root_fr, nullifier_hash_fr, recipient_square_fr];
 
-        // 4. Verify Proof
+        // 7. Verify Proof
         let is_valid = Self::verify_groth16(&env, vk, proof, pub_signals)?;
         if !is_valid {
             return Err(PoolError::InvalidProof);
         }
 
-        // 5. Mark nullifier as spent
+        // 8. Mark nullifier as spent
         env.storage().persistent().set(&DataKey::Nullifier(nullifier_hash_bytes), &true);
 
-        // 6. Transfer funds
+        // 9. Transfer funds
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
         token_client.transfer(&env.current_contract_address(), &to, &amount);
