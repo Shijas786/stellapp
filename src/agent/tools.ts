@@ -1778,6 +1778,7 @@ ${rustCode}
     case "deposit_private_pool": {
       const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.assetCode || "USDC").toUpperCase();
+      const amountStr = args.amount;
       
       let poolContractId = (args.contractId || "").trim();
       
@@ -1796,6 +1797,30 @@ ${rustCode}
             }
           }
         } catch {}
+
+        // 0. Dynamic routing for USDC denominations: 1, 5, 10, 50, 100
+        if (!poolContractId && assetCode === "USDC") {
+          const supportedDenoms = ["1", "5", "10", "50", "100"];
+          if (!supportedDenoms.includes(amountStr)) {
+            throw new Error(`USDC Privacy Pools only support fixed denominations of 1, 5, 10, 50, or 100 USDC to prevent amount correlation attacks. For arbitrary amounts (like ${amountStr} USDC), please use ZK Confidential Transfers instead.`);
+          }
+
+          // Try to load the specific pool contract ID from the session state
+          try {
+            const record = await prisma.sessionState.findUnique({ where: { chatId } });
+            const state = record ? JSON.parse(record.stateJson) : {};
+            if (state[`pool_USDC_${amountStr}`]) {
+              poolContractId = state[`pool_USDC_${amountStr}`];
+              console.log(`[ZK Pool] Routed ${amountStr} USDC deposit to dynamic pool: ${poolContractId}`);
+            }
+          } catch {}
+
+          // Fallback for 10 USDC (our default pool)
+          if (!poolContractId && amountStr === "10" && process.env.DEFAULT_USDC_POOL) {
+            poolContractId = process.env.DEFAULT_USDC_POOL;
+            console.log(`[ZK Pool] Routed 10 USDC deposit to default env pool: ${poolContractId}`);
+          }
+        }
 
         // 0. Use the authoritative production fallback pools if configured
         if (!poolContractId) {
@@ -1879,7 +1904,6 @@ ${rustCode}
       await clearPendingAction(chatId);
 
       const { secret, nullifier, commitment } = await zkPool.generateDeposit();
-      const amountStr = args.amount;
 
       // Ensure formatting of commitment as a hex string of 32 bytes
       // Snarkjs numbers are large BigInt strings, so we convert them to buffer then to hex

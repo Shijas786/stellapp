@@ -34,6 +34,9 @@ async function logConfidentialRegistries() {
 }
 logConfidentialRegistries();
 
+import { runTempDeploy } from "./services/temp_deploy";
+runTempDeploy();
+
 import { startRecurringWorker, setRecurringNotificationSender } from "./services/recurring-worker";
 import { startLedgerWatcher, setLedgerWatcherNotificationSender } from "./services/ledger-watcher";
 
