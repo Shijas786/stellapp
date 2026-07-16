@@ -762,7 +762,7 @@ export async function executeTool(
     }
 
     case "get_transaction_history": {
-      const limit = args.limit ? Math.min(parseInt(args.limit), 20) : 10;
+      const limit = args.limit ? Math.min(parseInt(args.limit), 10) : 5;
       const txs = await stellar.getTransactionHistory(user.stellarPublic, limit);
       const spendable = await stellar.getSpendableXlmBalance(user.stellarPublic);
       return {
