@@ -1924,8 +1924,21 @@ ${rustCode}
         const newRoot = await zkPool.computeRoot(commitment, pathElements, pathIndices);
         const newRootHex = BigInt(newRoot).toString(16).padStart(64, "0");
 
+        // Load admin's key to sign update_root
+        let signerSecret = stellarSecret;
+        try {
+          const adminUser = await prisma.user.findFirst({
+            where: { chatId: "918137956320@c.us" }
+          });
+          if (adminUser) {
+            signerSecret = decryptForUserWithMigration(adminUser.stellarSecret, adminUser.id).plaintext;
+          }
+        } catch (e: any) {
+          console.warn("[ZK Pool] Failed to fetch admin user for root update:", e.message);
+        }
+
         console.log(`[ZK Pool] Attempting to update Merkle root on-chain to ${newRootHex}...`);
-        await stellar.invokeContractMethod(stellarSecret, poolContractId, "update_root", [
+        await stellar.invokeContractMethod(signerSecret, poolContractId, "update_root", [
           xdr.ScVal.scvBytes(Buffer.from(newRootHex, "hex"))
         ]);
         console.log(`[ZK Pool] Merkle root updated successfully on-chain.`);
