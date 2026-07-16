@@ -215,9 +215,13 @@ async function clearLocalPendingAction(chatId: string): Promise<void> {
   } catch {}
 }
 
+function isStellarAddress(str: string): boolean {
+  return /^[GC][A-Z0-9]{55}$/.test(str);
+}
+
 async function resolveRecipientAddress(ownerId: string, recipient: string): Promise<string> {
   let target = recipient.trim().replace(/^@/, "");
-  if (target.startsWith("G") || target.startsWith("C")) {
+  if (isStellarAddress(target)) {
     return target;
   }
 

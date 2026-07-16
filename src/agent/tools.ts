@@ -99,6 +99,60 @@ function getLevenshteinDistance(a: string, b: string): number {
   return tmp[a.length][b.length];
 }
 
+function isStellarAddress(str: string): boolean {
+  return /^[GC][A-Z0-9]{55}$/.test(str);
+}
+
+async function getMerklePath(allDeposits: any[], leafIndex: number): Promise<{ pathElements: string[], pathIndices: string[] }> {
+  const level0: string[] = [];
+  for (let i = 0; i < 16; i++) {
+    const dep = allDeposits.find(d => d.leafIndex === i);
+    if (dep) {
+      const commitmentStr = BigInt("0x" + dep.commitmentHex).toString();
+      level0.push(commitmentStr);
+    } else {
+      level0.push("0");
+    }
+  }
+
+  const poseidon2 = async (x: string, y: string) => {
+    return zkPool.recomputeCommitment(y, x);
+  };
+
+  const level1: string[] = [];
+  for (let i = 0; i < 16; i += 2) {
+    level1.push(await poseidon2(level0[i], level0[i+1]));
+  }
+
+  const level2: string[] = [];
+  for (let i = 0; i < 8; i += 2) {
+    level2.push(await poseidon2(level1[i], level1[i+1]));
+  }
+
+  const level3: string[] = [];
+  for (let i = 0; i < 4; i += 2) {
+    level3.push(await poseidon2(level2[i], level2[i+1]));
+  }
+
+  const sibling0 = leafIndex % 2 === 0 ? level0[leafIndex + 1] : level0[leafIndex - 1];
+  const idx1 = Math.floor(leafIndex / 2);
+  const sibling1 = idx1 % 2 === 0 ? level1[idx1 + 1] : level1[idx1 - 1];
+  const idx2 = Math.floor(leafIndex / 4);
+  const sibling2 = idx2 % 2 === 0 ? level2[idx2 + 1] : level2[idx2 - 1];
+  const idx3 = Math.floor(leafIndex / 8);
+  const sibling3 = idx3 % 2 === 0 ? level3[idx3 + 1] : level3[idx3 - 1];
+
+  return {
+    pathElements: [sibling0, sibling1, sibling2, sibling3],
+    pathIndices: [
+      String(leafIndex % 2),
+      String(idx1 % 2),
+      String(idx2 % 2),
+      String(idx3 % 2)
+    ]
+  };
+}
+
 async function isLatestMessageConfirmation(chatId: string): Promise<boolean> {
   try {
     const record = await prisma.chatHistory.findUnique({ where: { chatId } });
@@ -820,7 +874,7 @@ export async function executeTool(
       }
 
       // 1. Resolve contact name to phone number/address if it's not a phone number or Stellar key
-      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+      if (!isStellarAddress(recipient)) {
         const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
         const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
         
@@ -848,7 +902,7 @@ export async function executeTool(
         }
       }
 
-      if (recipient.startsWith("G") || recipient.startsWith("C")) {
+      if (isStellarAddress(recipient)) {
         return `Recipient resolved successfully.\nStellar Address: ${recipient}`;
       }
 
@@ -933,7 +987,7 @@ export async function executeTool(
 
       // Step 0: Contact name lookup — if recipient is not a G/C address or phone number,
       // treat it as a contact name and look up the phone number from the DB.
-      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+      if (!isStellarAddress(recipient)) {
         const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
         const isPhone = /^[0-9]{10,18}$/.test(cleanedForPhone);
         
@@ -1010,7 +1064,7 @@ export async function executeTool(
     }
 
       // Check if recipient is a custom username or phone number instead of standard key (does not start with G or C)
-      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+      if (!isStellarAddress(recipient)) {
         const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
         const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
         if (isPhone) {
@@ -1260,7 +1314,7 @@ export async function executeTool(
       let resolvedAddr = "";
       let recipientName = "";
 
-      if (recipient.startsWith("G") || recipient.startsWith("C")) {
+      if (isStellarAddress(recipient)) {
         resolvedAddr = recipient;
       } else {
         const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
@@ -1729,28 +1783,29 @@ ${rustCode}
       
       // Auto-lookup logic if no valid contractId is specified
       if (!poolContractId || poolContractId.startsWith("C...") || poolContractId.length < 10) {
-        
-        // 0. Use the authoritative production fallback pools if configured
-        if (assetCode === "USDC" && process.env.DEFAULT_USDC_POOL) {
-          poolContractId = process.env.DEFAULT_USDC_POOL;
-          console.log(`[ZK Pool] Routed deposit to authoritative env USDC pool: ${poolContractId}`);
-        } else if (assetCode === "XLM" && process.env.DEFAULT_XLM_POOL) {
-          poolContractId = process.env.DEFAULT_XLM_POOL;
-          console.log(`[ZK Pool] Routed deposit to authoritative env XLM pool: ${poolContractId}`);
-        }
-        
+        poolContractId = "";
+
         // A. Check current user's session state for their recently deployed pool
-        if (!poolContractId) {
-          try {
-            const record = await prisma.sessionState.findUnique({ where: { chatId } });
-            if (record) {
-              const state = JSON.parse(record.stateJson);
-              if (state[`latest_pool_${assetCode}`]) {
-                poolContractId = state[`latest_pool_${assetCode}`];
-                console.log(`[ZK Pool] Auto-resolved pool contract ID from session: ${poolContractId}`);
-              }
+        try {
+          const record = await prisma.sessionState.findUnique({ where: { chatId } });
+          if (record) {
+            const state = JSON.parse(record.stateJson);
+            if (state[`latest_pool_${assetCode}`]) {
+              poolContractId = state[`latest_pool_${assetCode}`];
+              console.log(`[ZK Pool] Auto-resolved pool contract ID from session: ${poolContractId}`);
             }
-          } catch {}
+          }
+        } catch {}
+
+        // 0. Use the authoritative production fallback pools if configured
+        if (!poolContractId) {
+          if (assetCode === "USDC" && process.env.DEFAULT_USDC_POOL) {
+            poolContractId = process.env.DEFAULT_USDC_POOL;
+            console.log(`[ZK Pool] Routed deposit to authoritative env USDC pool: ${poolContractId}`);
+          } else if (assetCode === "XLM" && process.env.DEFAULT_XLM_POOL) {
+            poolContractId = process.env.DEFAULT_XLM_POOL;
+            console.log(`[ZK Pool] Routed deposit to authoritative env XLM pool: ${poolContractId}`);
+          }
         }
 
         // B. Check past deposits from this user
@@ -1860,15 +1915,11 @@ ${rustCode}
 
       // Calculate the new Merkle root and try to update it on-chain (if the user is the admin)
       try {
-        const siblingIndex = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
         const allDeposits = await prisma.privacyDeposit.findMany({
           where: { contractId: poolContractId },
           orderBy: { leafIndex: "asc" }
         });
-        const sibling = allDeposits.find(d => d.leafIndex === siblingIndex);
-        const siblingHex = sibling ? sibling.commitmentHex : "0";
-        const pathElements = [siblingHex, "0", "0", "0"];
-        const pathIndices = [String(leafIndex % 2), "0", "0", "0"];
+        const { pathElements, pathIndices } = await getMerklePath(allDeposits, leafIndex);
         
         const newRoot = await zkPool.computeRoot(commitment, pathElements, pathIndices);
         const newRootHex = BigInt(newRoot).toString(16).padStart(64, "0");
@@ -1950,7 +2001,7 @@ ${rustCode}
         recipient = user.stellarPublic;
       } else {
         // Resolve contact name to phone number
-        if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        if (!isStellarAddress(recipient)) {
           const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
           const isPhone = /^[0-9]{10,18}$/.test(cleanedForPhone);
           
@@ -1980,7 +2031,7 @@ ${rustCode}
         }
 
         // Resolve phone number to Stellar address
-        if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+        if (!isStellarAddress(recipient)) {
           const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
           const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
           if (isPhone) {
@@ -2030,11 +2081,7 @@ ${rustCode}
 
       // Build Merkle path using sibling commitments
       const leafIndex = depositRecord.leafIndex;
-      const siblingIndex = leafIndex % 2 === 0 ? leafIndex + 1 : leafIndex - 1;
-      const sibling = allDeposits.find(d => d.leafIndex === siblingIndex);
-      const siblingHex = sibling ? sibling.commitmentHex : "0";
-      const pathElements = [siblingHex, "0", "0", "0"];
-      const pathIndices = [String(leafIndex % 2), "0", "0", "0"];
+      const { pathElements, pathIndices } = await getMerklePath(allDeposits, leafIndex);
 
       const currentRoot = await zkPool.computeRoot(commitment, pathElements, pathIndices);
 
@@ -2239,7 +2286,7 @@ ${rustCode}
       let recipient = args.recipient.trim().replace(/^@/, "");
 
       // Resolve contact name to phone number
-      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+      if (!isStellarAddress(recipient)) {
         const cleanedForPhone = recipient.replace(/[\s\-+]/g, "");
         const isPhone = /^[0-9]{10,18}$/.test(cleanedForPhone);
         
@@ -2269,7 +2316,7 @@ ${rustCode}
       }
 
       // Resolve phone number to Stellar address
-      if (!recipient.startsWith("G") && !recipient.startsWith("C")) {
+      if (!isStellarAddress(recipient)) {
         const cleanedRecipient = recipient.replace(/[\s\-+]/g, "");
         const isPhone = /^[0-9]{10,18}$/.test(cleanedRecipient);
         if (isPhone) {
