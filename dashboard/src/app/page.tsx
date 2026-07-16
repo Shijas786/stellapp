@@ -1525,6 +1525,28 @@ export default function LandingPage() {
                       <p>We support all native Stellar assets including XLM, USDC, EURC, and AQUA.</p>
                   </div>
               </div>
+              <div className="faq-item">
+                  <button className="faq-question" onClick={toggleFaq}>
+                      How do ZK Privacy Pools work on Stellapp?
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="faq-icon">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                  </button>
+                  <div className="faq-answer">
+                      <p>ZK Privacy Pools shield your transaction history by breaking the on-chain link between the depositor and the withdrawer. When you deposit assets into the pool, you receive a secret proof of membership. Later, you can withdraw these assets to a clean, brand-new address by presenting a zero-knowledge proof. It is mathematically impossible for anyone to link the two addresses.</p>
+                  </div>
+              </div>
+              <div className="faq-item">
+                  <button className="faq-question" onClick={toggleFaq}>
+                      What is the difference between Privacy Pools and Confidential Transfers?
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="faq-icon">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                  </button>
+                  <div className="faq-answer">
+                      <p>Privacy Pools break the trace/link between the sender and recipient to make transactions untraceable. Confidential Transfers keep the sender-recipient link but fully encrypt the transaction amounts on-chain. Using zero-knowledge range proofs, the network verifies that you have enough funds to complete a transfer without ever revealing your actual balance or transfer size to the public ledger.</p>
+                  </div>
+              </div>
           </div>
       </section>
 
@@ -1565,7 +1587,7 @@ export default function LandingPage() {
                   <h4 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Product</h4>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '15px' }}>
                       <li><a href="#features" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Showcase</a></li>
-                      <li><a href="/dashboard/roadmap" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Roadmap</a></li>
+                      <li><a href="/roadmap" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Roadmap</a></li>
                       <li><a href="https://wa.me/917012751478?text=create%20wallet" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Get Started</a></li>
                   </ul>
               </div>

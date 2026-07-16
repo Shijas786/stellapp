@@ -194,6 +194,24 @@ export async function handleIncomingMessage(
           user = await prisma.user.findUnique({ where: { chatId } });
           if (!user) throw createErr;
         }
+
+        // Self-healing / immediate re-encryption to use user.id instead of chatId
+        try {
+          decryptForUserWithMigration(user.stellarSecret, user.id);
+        } catch (err) {
+          try {
+            const { plaintext: rawSecret } = decryptForUserWithMigration(user.stellarSecret, chatId);
+            const encryptedWithUserId = encryptForUser(rawSecret, user.id);
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: { stellarSecret: encryptedWithUserId }
+            });
+            console.log(`[Controller] Successfully re-encrypted wallet secret with user.id for: ${user.id}`);
+          } catch (decryptErr) {
+            console.error(`[Controller] Failed to decrypt wallet secret even with chatId fallback:`, decryptErr);
+          }
+        }
+
         console.log(`[Controller] New user wallet created: ${user.stellarPublic}`);
       } else {
         user = await prisma.user.update({
