@@ -188,24 +188,6 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "switch_network",
-      description: "Switch the user's active Stellar network mode between 'TESTNET' (play-money sandbox) and 'MAINNET' (real assets). Call this when the user explicitly requests to switch networks, or wants to perform an action on a different network (e.g., 'deploy a contract on testnet' while on mainnet). IMPORTANT: If switching networks, do not chain other on-chain tool calls (like deploy or transfer) in the same turn. Finish the turn by confirming the network switch, then execute other actions in the next user message.",
-      parameters: {
-        type: "object",
-        properties: {
-          network: {
-            type: "string",
-            enum: ["TESTNET", "MAINNET"],
-            description: "The target network to switch to."
-          }
-        },
-        required: ["network"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
       name: "get_wallet_address",
       description: "Return the user's Stellar wallet address. Call when the user asks 'what is my address', 'show my wallet', 'what is my public key', 'send me my address', or similar."
     }

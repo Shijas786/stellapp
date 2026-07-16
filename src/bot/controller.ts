@@ -17,53 +17,27 @@ export async function handleIncomingMessage(
 ): Promise<{ text: string; imagePath?: string; redactAfterMs?: number }> {
   // 0. Intercept network switches first
   const cleanTextLower = text.trim().toLowerCase();
-  if (cleanTextLower === "switch to mainnet" || cleanTextLower === "switch to testnet") {
-    const newMode = cleanTextLower.includes("mainnet") ? "MAINNET" : "TESTNET";
-    
-    // Update sessionState
-    const record = await prisma.sessionState.findUnique({ where: { chatId } });
-    let state = record ? JSON.parse(record.stateJson) : {};
-    state.networkMode = newMode;
-    await prisma.sessionState.upsert({
-      where: { chatId },
-      create: { chatId, stateJson: JSON.stringify(state) },
-      update: { stateJson: JSON.stringify(state) }
-    });
-
-    // Clear chat history to prevent context bleed
-    await prisma.chatHistory.deleteMany({ where: { chatId } }).catch(() => {});
-
-    const switchText = newMode === "MAINNET"
-      ? `🔄 Switched to *Stellar Mainnet*! Standard transfers, swaps, and contract deployments will now run on the live network.\n\n*(Note: ZK Privacy Pool and ZK Confidential transfers remain on Testnet for demo purposes).*`
-      : `🔄 Switched to *Stellar Testnet*! All features, including ZK Privacy and Confidential transfers, are now active in play-money sandbox mode.`;
-    
-    return { text: switchText };
+  if (cleanTextLower === "switch to mainnet") {
+    return { text: "❌ *Stellar Mainnet support is disabled.* Stellapp operates on **Stellar Testnet** only to ensure a safe, private sandbox playground." };
+  }
+  if (cleanTextLower === "switch to testnet") {
+    return { text: "🔄 Already on *Stellar Testnet*! All operations are running in play-money sandbox mode." };
   }
 
-  // 1. Determine active network mode
-  const sessionRecord = await prisma.sessionState.findUnique({ where: { chatId } });
-  let networkMode: "TESTNET" | "MAINNET" = process.env.STELLAR_NETWORK === "MAINNET" ? "MAINNET" : "TESTNET";
-  if (sessionRecord) {
-    const state = JSON.parse(sessionRecord.stateJson);
-    if (state.networkMode === "MAINNET" || state.networkMode === "TESTNET") {
-      networkMode = state.networkMode;
-    }
-  }
+  // 1. Force network mode to TESTNET
+  const networkMode: "TESTNET" | "MAINNET" = "TESTNET";
 
-  // 1.1 Intercept onboarding network choices
-  let selectedOnboardNetwork: "TESTNET" | "MAINNET" | null = null;
+  // 1.1 Intercept onboarding network choices (ignore mainnet)
+  let selectedOnboardNetwork: "TESTNET" | null = null;
   if (/\b(create|make|setup|new|generate)\b/i.test(cleanTextLower) && /\b(testnet|play|sandbox)\b/i.test(cleanTextLower)) {
     selectedOnboardNetwork = "TESTNET";
-  } else if (/\b(create|make|setup|new|generate)\b/i.test(cleanTextLower) && /\b(mainnet|real|live)\b/i.test(cleanTextLower)) {
-    selectedOnboardNetwork = "MAINNET";
   }
 
   if (selectedOnboardNetwork) {
-    networkMode = selectedOnboardNetwork;
     // Save to session state so it is remembered
     const record = await prisma.sessionState.findUnique({ where: { chatId } });
     let state = record ? JSON.parse(record.stateJson) : {};
-    state.networkMode = selectedOnboardNetwork;
+    state.networkMode = "TESTNET";
     await prisma.sessionState.upsert({
       where: { chatId },
       create: { chatId, stateJson: JSON.stringify(state) },
@@ -167,8 +141,7 @@ export async function handleIncomingMessage(
             `🤖 AI assistance whenever you need it\n\n` +
             `Everything happens through a simple chat.\n\n` +
             `To get started, reply with:\n` +
-            `👉 *create testnet wallet* (play-money sandbox)\n` +
-            `👉 *create mainnet wallet* (real assets)`,
+            `👉 *create wallet* to get started!`,
           imagePath: path.join(process.cwd(), 'public', 'assets', 'onboarding.png')
         };
       }
@@ -263,14 +236,11 @@ export async function handleIncomingMessage(
         ? `🏷️ *Your Username:* *${user.username}* (Address: \`${user.username}*stellapp.com\`)\n\n`
         : "";
 
-      const zkPrivacyStatus = networkMode === "TESTNET"
-        ? `🛡️ *ZK Privacy Enabled*\n` +
-          `Send assets confidentially on-chain using zero-knowledge proofs.\n\n`
-        : `🔒 *Secure Mainnet Mode*\n` +
-          `Standard payments, swaps, and smart contracts are fully active with real assets.\n\n`;
+      const zkPrivacyStatus = `🛡️ *ZK Privacy Enabled*\n` +
+          `Send assets confidentially on-chain using zero-knowledge proofs.\n\n`;
 
       const welcomeText = `✨ *Wallet Created Successfully!* 💳\n` +
-        `Active Network: *Stellar ${networkMode === "MAINNET" ? "Mainnet" : "Testnet"}*\n\n` +
+        `Active Network: *Stellar Testnet*\n\n` +
         `Your personal Stellar wallet is active:\n` +
         `\`${user.stellarPublic}\`\n\n` +
         usernameStatus +

@@ -6,9 +6,7 @@ dotenv.config();
 
 export const config = {
   get isMainnet(): boolean {
-    const active = networkStorage.getStore();
-    if (active) return active === "MAINNET";
-    return process.env.STELLAR_NETWORK === "MAINNET";
+    return false;
   },
   
   openaiModel: process.env.OPENAI_MINI_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna",
