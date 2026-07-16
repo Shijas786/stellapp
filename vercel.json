@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "buildCommand": "cd dashboard && npm install --include=dev && npm run build",
+  "outputDirectory": "dashboard/out",
+  "cleanUrls": true
+}

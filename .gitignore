@@ -37,3 +37,4 @@ compiler_template/target/
 skills-lock.json
 finetuning_data.jsonl
 
+.vercel
