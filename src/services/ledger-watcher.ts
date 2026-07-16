@@ -52,6 +52,15 @@ export function startLedgerWatcher() {
             // Avoid notifying on self-transfers (swaps, merging, etc.)
             if (fromAddress === toAddress) return;
 
+            // Avoid duplicate notifications for internal transfers (already notified by tools/router)
+            const senderUser = await prisma.user.findFirst({
+              where: { stellarPublic: fromAddress }
+            });
+            if (senderUser) {
+              console.log(`[Ledger Watcher] Internal payment from ${fromAddress} to ${toAddress} detected; skipping duplicate notification.`);
+              return;
+            }
+
             console.log(`[Ledger Watcher] Payment detected to registered user: ${amount} ${assetCode} to ${toAddress}`);
 
             // Fetch new balances for a rich notification card
