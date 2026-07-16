@@ -445,14 +445,14 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deploy_privacy_pool",
-      description: "Deploy a Zero-Knowledge (ZK) Privacy Pool contract on Stellar for shielding assets (USDC or XLM).",
+      description: "Deploy a Zero-Knowledge (ZK) Privacy Pool contract on Stellar for shielding USDC.",
       parameters: {
         type: "object",
         properties: {
           assetCode: {
             type: "string",
-            description: "The asset symbol to deploy the privacy pool for: 'USDC' or 'XLM'",
-            enum: ["USDC", "XLM"]
+            description: "The asset symbol to deploy the privacy pool for. Currently only 'USDC' is supported.",
+            enum: ["USDC"]
           }
         },
         required: ["assetCode"]
@@ -463,7 +463,7 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "deposit_private_pool",
-      description: "Deposit public tokens (USDC or XLM) into a ZK Privacy Pool contract to shield them. Returns a cryptographic secret note required for withdrawal.",
+      description: "Deposit public USDC into a ZK Privacy Pool contract to shield them. Returns a cryptographic secret note required for withdrawal.",
       parameters: {
         type: "object",
         properties: {
@@ -477,7 +477,8 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           },
           assetCode: {
             type: "string",
-            description: "The asset symbol to deposit: 'USDC' or 'XLM'."
+            description: "The asset symbol to deposit: 'USDC'.",
+            enum: ["USDC"]
           }
         },
         required: ["amount", "assetCode"]

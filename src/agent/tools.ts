@@ -1835,9 +1835,6 @@ ${rustCode}
           if (assetCode === "USDC" && process.env.DEFAULT_USDC_POOL) {
             poolContractId = process.env.DEFAULT_USDC_POOL;
             console.log(`[ZK Pool] Routed deposit to authoritative env USDC pool: ${poolContractId}`);
-          } else if (assetCode === "XLM" && process.env.DEFAULT_XLM_POOL) {
-            poolContractId = process.env.DEFAULT_XLM_POOL;
-            console.log(`[ZK Pool] Routed deposit to authoritative env XLM pool: ${poolContractId}`);
           }
         }
 
