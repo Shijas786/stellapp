@@ -733,6 +733,10 @@ export class WhatsAppBot {
 
   public async sendMessage(chatId: string, text: string): Promise<string> {
     const sentMsg = await this.client.sendMessage(chatId, text);
+    if (!sentMsg || !sentMsg.id) {
+      console.warn(`[WhatsApp] sendMessage returned undefined/null for ${chatId}. Returning fallback ID.`);
+      return `msg_fallback_${Date.now()}`;
+    }
     return sentMsg.id._serialized;
   }
 
