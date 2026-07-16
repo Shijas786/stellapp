@@ -1815,10 +1815,13 @@ ${rustCode}
             }
           } catch {}
 
-          // Fallback for 10 USDC (our default pool)
-          if (!poolContractId && amountStr === "10" && process.env.DEFAULT_USDC_POOL) {
-            poolContractId = process.env.DEFAULT_USDC_POOL;
-            console.log(`[ZK Pool] Routed 10 USDC deposit to default env pool: ${poolContractId}`);
+          // Fallback to default env pools for denominations: 1, 5, 10, 50, 100
+          if (!poolContractId) {
+            const envVarName = amountStr === "10" ? "DEFAULT_USDC_POOL" : `DEFAULT_USDC_POOL_${amountStr}`;
+            if (process.env[envVarName]) {
+              poolContractId = process.env[envVarName];
+              console.log(`[ZK Pool] Routed ${amountStr} USDC deposit to default env pool: ${poolContractId}`);
+            }
           }
         }
 
