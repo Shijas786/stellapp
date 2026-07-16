@@ -1779,6 +1779,14 @@ ${rustCode}
       const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const assetCode = (args.assetCode || "USDC").toUpperCase();
       const amountStr = args.amount;
+
+      // Unconditionally validate denomination size for USDC privacy pools
+      if (assetCode === "USDC") {
+        const supportedDenoms = ["1", "5", "10", "50", "100"];
+        if (!supportedDenoms.includes(amountStr)) {
+          throw new Error(`USDC Privacy Pools only support fixed denominations of 1, 5, 10, 50, or 100 USDC to prevent amount correlation attacks. For arbitrary amounts (like ${amountStr} USDC), please use ZK Confidential Transfers instead.`);
+        }
+      }
       
       let poolContractId = (args.contractId || "").trim();
       
@@ -1800,11 +1808,6 @@ ${rustCode}
 
         // 0. Dynamic routing for USDC denominations: 1, 5, 10, 50, 100
         if (!poolContractId && assetCode === "USDC") {
-          const supportedDenoms = ["1", "5", "10", "50", "100"];
-          if (!supportedDenoms.includes(amountStr)) {
-            throw new Error(`USDC Privacy Pools only support fixed denominations of 1, 5, 10, 50, or 100 USDC to prevent amount correlation attacks. For arbitrary amounts (like ${amountStr} USDC), please use ZK Confidential Transfers instead.`);
-          }
-
           // Try to load the specific pool contract ID from the session state
           try {
             const record = await prisma.sessionState.findUnique({ where: { chatId } });
