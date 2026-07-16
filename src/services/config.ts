@@ -9,8 +9,8 @@ export const config = {
     return false;
   },
   
-  openaiModel: process.env.OPENAI_MINI_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna",
-  openaiMiniModel: process.env.OPENAI_MINI_MODEL || "gpt-5.6-luna",
+  openaiModel: process.env.OPENAI_MODEL || "gpt-5.6-luna",
+  openaiMiniModel: process.env.OPENAI_MINI_MODEL || "gpt-4o-mini",
   openaiVectorStoreId: process.env.OPENAI_VECTOR_STORE_ID || "",
   
   // Stellar configurations

@@ -277,11 +277,36 @@ export async function handleIncomingMessage(
 
     // ── Route directly to AI agent loop for a unified AI experience ──────────
     try {
+      // Contract deployment, compilation, and Rust code generation requires the premium model (gpt-5.6-luna).
+      // Other standard interactions (swapping, sending, checking balance) run on the cheaper mini model (gpt-4o-mini).
+      const isContractIntent = /deploy|contract|compile|code|rust|soroban|wasm|builder|smart contract/i.test(text);
+      let isContractWorkflow = false;
+      try {
+        const sessionRecord = await prisma.sessionState.findUnique({ where: { chatId } });
+        if (sessionRecord) {
+          const state = JSON.parse(sessionRecord.stateJson);
+          const stateStr = JSON.stringify(state).toLowerCase();
+          if (
+            stateStr.includes("contract") ||
+            stateStr.includes("rust") ||
+            stateStr.includes("wasm") ||
+            stateStr.includes("compile") ||
+            stateStr.includes("deploy")
+          ) {
+            isContractWorkflow = true;
+          }
+        }
+      } catch (err) {
+        console.error("[Controller] Failed to parse session workflow state:", err);
+      }
+
+      const forceExpensive = isContractIntent || isContractWorkflow;
+
       const aiResponse = await runAgentLoop(chatId, text, {
         id: user.id,
         stellarPublic: user.stellarPublic,
         stellarSecret: user.stellarSecret,
-      }, true); // Always use primary agent model (gpt-4o) for high accuracy
+      }, forceExpensive);
       
       const isExportMsg = aiResponse.includes("🔑 *Wallet Export Details*") || aiResponse.includes("*Secret Key:*");
       return { 
