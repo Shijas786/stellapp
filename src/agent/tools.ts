@@ -1794,20 +1794,8 @@ ${rustCode}
       if (!poolContractId || poolContractId.startsWith("C...") || poolContractId.length < 10) {
         poolContractId = "";
 
-        // A. Check current user's session state for their recently deployed pool
-        try {
-          const record = await prisma.sessionState.findUnique({ where: { chatId } });
-          if (record) {
-            const state = JSON.parse(record.stateJson);
-            if (state[`latest_pool_${assetCode}`]) {
-              poolContractId = state[`latest_pool_${assetCode}`];
-              console.log(`[ZK Pool] Auto-resolved pool contract ID from session: ${poolContractId}`);
-            }
-          }
-        } catch {}
-
-        // 0. Dynamic routing for USDC denominations: 1, 5, 10, 50, 100
-        if (!poolContractId && assetCode === "USDC") {
+        // A. Dynamic routing for USDC denominations: 1, 5, 10, 50, 100 (Highest Priority)
+        if (assetCode === "USDC") {
           // Try to load the specific pool contract ID from the session state
           try {
             const record = await prisma.sessionState.findUnique({ where: { chatId } });
@@ -1828,7 +1816,21 @@ ${rustCode}
           }
         }
 
-        // 0. Use the authoritative production fallback pools if configured
+        // B. Check current user's session state for their recently deployed generic pool (Fallback)
+        if (!poolContractId) {
+          try {
+            const record = await prisma.sessionState.findUnique({ where: { chatId } });
+            if (record) {
+              const state = JSON.parse(record.stateJson);
+              if (state[`latest_pool_${assetCode}`]) {
+                poolContractId = state[`latest_pool_${assetCode}`];
+                console.log(`[ZK Pool] Auto-resolved pool contract ID from session fallback: ${poolContractId}`);
+              }
+            }
+          } catch {}
+        }
+
+        // C. Use the authoritative production fallback pools if configured (Fallback)
         if (!poolContractId) {
           if (assetCode === "USDC" && process.env.DEFAULT_USDC_POOL) {
             poolContractId = process.env.DEFAULT_USDC_POOL;
