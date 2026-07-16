@@ -81,10 +81,8 @@ function sanitizeHistory(history: OpenAI.Chat.ChatCompletionMessageParam[]): Ope
 async function saveHistory(chatId: string, history: OpenAI.Chat.ChatCompletionMessageParam[]): Promise<void> {
   let cleanHistory = sanitizeHistory(history);
 
-  // Prune by approximate TOKEN BUDGET (not message count).
-  // One message can contain 5 tokens or 5,000 tokens (skill docs, contract code, ZK outputs).
-  // Rough estimate: JSON serialised bytes / 4 ≈ tokens. Target 80K tokens (leaves 48K for response).
-  const TOKEN_BUDGET = 80_000;
+  // Rough estimate: JSON serialised bytes / 4 ≈ tokens. Target 20K tokens (leaves plenty of space for response).
+  const TOKEN_BUDGET = 20_000;
   const estimateTokens = (h: typeof cleanHistory) => JSON.stringify(h).length / 4;
 
   if (estimateTokens(cleanHistory) > TOKEN_BUDGET) {
