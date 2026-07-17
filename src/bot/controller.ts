@@ -4,6 +4,7 @@ import { encryptForUser, decryptForUserWithMigration } from "../services/encrypt
 import { createStellarWallet, fundStellarAccount, ensureUSDCTrustline } from "../services/stellar";
 import { runAgentLoop, appendChatRound } from "../agent/agent";
 import { networkStorage } from "../services/network-context";
+import { GATED_FINANCIAL_ACTIONS } from "../agent/tools";
 import path from "path";
 
 /**
@@ -301,15 +302,7 @@ export async function handleIncomingMessage(
           }
           if (state._pending_action) {
             const pending = JSON.parse(state._pending_action);
-            const financialActions = [
-              "send_stellar",
-              "swap_tokens",
-              "schedule_recurring_swap",
-              "setup_recurring_transfer",
-              "confidential_transfer",
-              "confidential_merge"
-            ];
-            if (financialActions.includes(pending.name)) {
+            if ((GATED_FINANCIAL_ACTIONS as readonly string[]).includes(pending.name)) {
               isFinancialWorkflow = true;
             }
           }

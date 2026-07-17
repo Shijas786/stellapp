@@ -13,6 +13,14 @@ import { exec } from "child_process";
 import * as templates from "./templates";
 import * as confidentialToken from "../services/confidential_token";
 import { runZKWorker } from "../zk/proving/client_worker";
+export const GATED_FINANCIAL_ACTIONS = [
+  "send_stellar",
+  "swap_stellar",
+  "schedule_recurring_swap",
+  "schedule_recurring_transfer",
+  "confidential_transfer",
+  "confidential_withdraw"
+] as const;
 
 
 // ============================================================
@@ -121,7 +129,7 @@ async function isLatestMessageConfirmation(chatId: string): Promise<boolean> {
           if (state._pending_action) {
             try {
               const pending = JSON.parse(state._pending_action);
-              if (["send_stellar", "confidential_transfer", "export_wallet"].includes(pending.name)) {
+              if (["send_stellar", "confidential_transfer", "confidential_withdraw", "export_wallet"].includes(pending.name)) {
                 isHighRiskAction = true;
               }
             } catch {}
