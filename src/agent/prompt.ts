@@ -116,19 +116,12 @@ you MUST use the search tool (vector store/file search) to retrieve official ref
 
 ---
 
-## ZK Privacy Systems (Privacy Pool vs Confidential Transfers)
-You support two separate Zero-Knowledge systems. Keep them distinct:
-1. ZK Privacy Pool (Shielding & Mixing):
-   • Works by depositing funds into a pool, which returns a ZK Secret Note ('stellapp-zk-v1_...').
-   • **CRITICAL**: Whenever a user deposits funds into the privacy pool, you **MUST** display the exact ZK Secret Note ('stellapp-zk-v1_...') returned by the deposit tool to the user in your message so they can copy and save it. Never omit, truncate, or hide this secret note.
-   • Anyone holding this note can later withdraw the funds anonymously.
-   • If a user provides a ZK Secret Note and says "send to [recipient]" or "withdraw to [recipient]", or if they ask to forward/send the note from context (e.g. "send the note to Bob", "you send him, you have the note", "withdraw the note to Bob"), locate the last ZK Secret Note ('stellapp-zk-v1_...') from the chat history and call 'withdraw_private_pool' with that 'secretNote' and set 'recipient' to that contact. If they ask to "transfer" or "send" via the privacy pool without a note, explain that they must first "deposit" to get a ZK Secret Note, or they can directly withdraw an existing note to a recipient.
-   • Tools: 'deploy_privacy_pool', 'deposit_private_pool', 'withdraw_private_pool'. Recommend standard users to deposit directly into the official pool. Only use 'deploy_privacy_pool' if explicitly requested by developers/admins.
-2. ZK Confidential Transfers (Encrypted Balances):
-   • Works by wrapping tokens on-chain into a private account balance where amounts and balances are fully hidden.
-   • Requires the user to register ('confidential_register'), deposit ('confidential_deposit'), and merge ('confidential_merge') incoming tokens.
-   • Allows direct private peer-to-peer transfers of hidden amounts.
-   • Tools: 'confidential_register', 'confidential_deposit', 'confidential_merge', 'confidential_transfer', 'confidential_withdraw', 'confidential_balance'.
+## ZK Confidential Transfers (Encrypted Balances)
+You support ZK Confidential Transfers which allow users to shield and transfer tokens privately:
+• Works by wrapping tokens on-chain into a private account balance where amounts and balances are fully hidden.
+• Requires the user to register ('confidential_register' or 'confidential_register_all' to register both XLM and USDC), deposit ('confidential_deposit'), and merge ('confidential_merge') incoming tokens.
+• Allows direct private peer-to-peer transfers of hidden amounts.
+• Tools: 'confidential_register', 'confidential_register_all', 'confidential_deposit', 'confidential_merge', 'confidential_transfer', 'confidential_withdraw', 'confidential_balance'.
 
 ---
 
@@ -438,71 +431,6 @@ export const OPENAI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
           }
         },
         required: ["recipient"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "deploy_privacy_pool",
-      description: "Deploy a Zero-Knowledge (ZK) Privacy Pool contract on Stellar for shielding USDC.",
-      parameters: {
-        type: "object",
-        properties: {
-          assetCode: {
-            type: "string",
-            description: "The asset symbol to deploy the privacy pool for. Currently only 'USDC' is supported.",
-            enum: ["USDC"]
-          }
-        },
-        required: ["assetCode"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "deposit_private_pool",
-      description: "Deposit public USDC into a ZK Privacy Pool contract to shield them. Returns a cryptographic secret note required for withdrawal.",
-      parameters: {
-        type: "object",
-        properties: {
-          contractId: {
-            type: "string",
-            description: "Optional. The Stellar contract address of the privacy pool. If omitted, the system will automatically route to the official default pool for the specified asset (e.g., the default USDC pool)."
-          },
-          amount: {
-            type: "string",
-            description: "The amount of tokens to deposit and shield (e.g. '10.0')"
-          },
-          assetCode: {
-            type: "string",
-            description: "The asset symbol to deposit: 'USDC'.",
-            enum: ["USDC"]
-          }
-        },
-        required: ["amount", "assetCode"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "withdraw_private_pool",
-      description: "Withdraw public tokens from a ZK Privacy Pool back to the user's wallet by proving ownership using a ZK Secret Note.",
-      parameters: {
-        type: "object",
-        properties: {
-          secretNote: {
-            type: "string",
-            description: "The secret note generated during deposit (starts with 'stellapp-zk-v1_')"
-          },
-          recipient: {
-            type: "string",
-            description: "Optional. The recipient's contact name, phone number, or Stellar address. If omitted, withdraws back to the active user's own wallet."
-          }
-        },
-        required: ["secretNote"]
       }
     }
   },

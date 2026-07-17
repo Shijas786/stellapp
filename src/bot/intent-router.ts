@@ -49,7 +49,7 @@ const HELP_PATTERNS = [
 const COMPLEX_PATTERNS = [
   /\b(deploy|write|create|build|compile|audit|generate|code|program)\b.*\b(contract|smart contract|soroban|wasm)\b/i,
   /\b(vesting|timelock|crowdfund|nft|token contract|dao)\b/i,
-  /\b(confidential|private|zk|zero.?knowledge|privacy pool|proof|proving)\b/i,
+  /\b(confidential|private|zk|zero.?knowledge|proof|proving)\b/i,
   /\b(bridge|cctp|cross.?chain)\b/i,
   /\b(explain|understand|what is|how does|why|debug|error|failed)\b.*\b(contract|soroban|stellar sdk|transaction)\b/i,
   /\b(swap|exchange|trade)\b.*\b(to|for)\b/i, // swap needs DEX path + slippage reasoning
@@ -71,7 +71,7 @@ New to ZK on Stellar? Start with the official docs, then use our ZK/Privacy skil
 • ZK Proofs on Stellar (docs): https://developers.stellar.org/docs/build/apps/zk
   Explanations of BN254 and Poseidon/Poseidon2 host functions, verification details, and circuit tooling.
 • Privacy on Stellar (docs): https://developers.stellar.org/docs/build/apps/privacy
-  Overview of Privacy Pools, Confidential Tokens, and cryptographic primitives.
+  Overview of Confidential Tokens and cryptographic primitives.
 • Announcing Stellar X-Ray (Protocol 25): https://stellar.org/blog/developers/announcing-stellar-x-ray-protocol-25
 • Yardstick (Protocol 26) upgrade guide: https://stellar.org/blog/foundation-news/stellar-yardstick-protocol-26-upgrade-guide
 
@@ -91,8 +91,6 @@ New to ZK on Stellar? Start with the official docs, then use our ZK/Privacy skil
 • UltraHonk verifier (Noir / Barretenberg):
   - https://github.com/yugocabrio/rs-soroban-ultrahonk
   - https://github.com/indextree/ultrahonk_soroban_contract
-• Stellar Private Payments (Privacy Pools PoC): https://github.com/NethermindEth/stellar-private-payments
-  Circom circuits, Groth16 proofs, and Stellar smart contracts. Companion docs: https://nethermindeth.github.io/stellar-private-payments/
 
 🛠️ *ZK Circuit Tooling*
 • Noir (Aztec): https://noir-lang.org/docs/
@@ -106,7 +104,6 @@ New to ZK on Stellar? Start with the official docs, then use our ZK/Privacy skil
 💡 *Further Privacy Context*
 • Confidential Token Association: https://www.confidentialtoken.org/
   Open standard for encryption-based on-chain confidentiality. Demo: https://www.youtube.com/watch?v=6NnDqVQYOHM
-• Privacy Pools whitepaper: https://privacypools.com/whitepaper.pdf
 
 🔧 *Core Stellar Dev Tools*
 • Stellar Docs: https://developers.stellar.org/

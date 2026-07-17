@@ -32,7 +32,7 @@ export default function RoadmapPage() {
       points: [
         'Stellar Testnet Wallets & DCA',
         'Soroban Compiler & Deployer',
-        'ZK Shielded Privacy Pool Transfers'
+        'ZK Shielded Confidential Transfers'
       ],
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

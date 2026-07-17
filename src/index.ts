@@ -333,10 +333,7 @@ http.createServer(async (_req, res) => {
     let recurringSwaps: any[] = [];
     let recurringTransfers: any[] = [];
     let limitOrders: any[] = [];
-    
     let confidentialRegistries: any[] = [];
-    let activeDeposits: any[] = [];
-    let totalShieldedLiquidity = 0;
 
     const contractsList: Array<{ id: string; type: string; deployer: string; date: string; recipient: string | null; lockDetails: string | null }> = [];
 
@@ -363,10 +360,6 @@ http.createServer(async (_req, res) => {
       });
 
       confidentialRegistries = await prisma.confidentialRegistry.findMany();
-      activeDeposits = await prisma.privacyDeposit.findMany({
-        where: { spent: false }
-      });
-      totalShieldedLiquidity = activeDeposits.reduce((sum, dep) => sum + parseFloat(dep.amount || "0"), 0);
 
       const deployDir = path.join(process.cwd(), "public", "deploys");
       if (fs.existsSync(deployDir)) {
@@ -700,11 +693,7 @@ http.createServer(async (_req, res) => {
                 <div class="value">${confidentialRegistries.length}</div>
                 <div class="sub">Active privacy tokens wrapper</div>
               </div>
-              <div class="stat-card">
-                <h3>Shielded Liquidity</h3>
-                <div class="value" style="color: var(--secondary);">${totalShieldedLiquidity.toFixed(2)} USDC</div>
-                <div class="sub">Held in privacy pool contract</div>
-              </div>
+
             </div>
 
             <!-- Navigation Tabs -->
@@ -973,40 +962,6 @@ http.createServer(async (_req, res) => {
                 </table>
               </div>
 
-              <!-- Unspent Deposits -->
-              <div class="card">
-                <h3 class="section-title">Active Shielded ZK Commitments (Unspent Privacy Deposits)</h3>
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Deposit ID</th>
-                      <th>Contract ID</th>
-                      <th>Asset</th>
-                      <th>Shielded Amount</th>
-                      <th>Pedersen Commitment Hash</th>
-                      <th>Merkle Leaf Index</th>
-                      <th>Deposited Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${activeDeposits.length === 0 ? `
-                      <tr><td colspan="7" class="no-data">No unspent deposits inside the ZK privacy pool.</td></tr>
-                    ` : activeDeposits.map(d => {
-                      return `
-                        <tr>
-                          <td class="monospace">${d.id.substring(0, 8)}...</td>
-                          <td class="monospace">${d.contractId.substring(0, 8)}...${d.contractId.substring(d.contractId.length - 8)}</td>
-                          <td style="font-weight: 500;">${d.assetCode}</td>
-                          <td class="monospace" style="color: var(--secondary);">${d.amount}</td>
-                          <td class="monospace" style="font-size: 11px;">${d.commitmentHex.substring(0, 16)}...${d.commitmentHex.substring(d.commitmentHex.length - 16)}</td>
-                          <td class="monospace">${d.leafIndex}</td>
-                          <td>${new Date(d.createdAt).toLocaleDateString()}</td>
-                        </tr>
-                      `;
-                    }).join('')}
-                  </tbody>
-                </table>
-              </div>
             </div>
 
 

@@ -133,24 +133,17 @@ export default function LandingPage() {
     },
     {
       num: "03",
-      title: "ZK Privacy Pool",
-      desc: "Mix and transfer tokens anonymously using Zero-Knowledge secret notes. Your transactions are decoupled from your address history.",
-      benefits: ["Total counterparty shielding", "Anonymous secret note mixing", "Zero trace on public explorer"]
-    },
-    {
-      num: "04",
       title: "Confidential Transfer",
       desc: "Send payments confidentially to shield transfer amounts. Harness homomorphic encryption to keep your transaction values hidden from public trackers.",
       benefits: ["Encrypted transfer amounts", "ZK Range validation proofs", "Shielded wallet balances"]
     },
     {
-      num: "05",
+      num: "04",
       title: "Automated Alerts & Jobs",
       desc: "Schedule automated recurring payments (DCA) and get real-time notification alerts whenever assets are received in your wallet.",
       benefits: ["Recurring payments & DCA", "Real-time receipt notifications", "Background state synchronization"]
     }
   ];
-
 
   useGSAP(() => {
     // 1. Hero Text Reveal Animation
@@ -604,118 +597,6 @@ export default function LandingPage() {
           setBotStatus('online');
 
         } else if (activeTab === 2) {
-          // --- Scenario 2: ZK Privacy Pool (Deposit -> Note -> Send) ---
-          setIsKeyboardActive(true);
-          await sleep(500);
-          if (!active) break;
-          await typeText("Send 5 USDC privately to Bob", setPhoneInput, 110);
-          await sleep(400);
-          if (!active) break;
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          setPhoneMessages(prev => [...prev, { id: 1, type: 'sent', text: "Send 5 USDC privately to Bob", time: t }]);
-          setPhoneInput('Message');
-          setIsKeyboardActive(false);
-          await sleep(600);
-          if (!active) break;
-
-          // Step 1: Deposit confirmation request
-          setBotStatus('typing...');
-          setPhoneMessages(prev => [...prev, { id: 2, type: 'received', text: '...', time: '', typing: true }]);
-          await sleep(1500);
-          if (!active) break;
-
-          setPhoneMessages(prev => prev.filter(m => !m.typing));
-          setPhoneMessages(prev => [...prev, {
-            id: 3,
-            type: 'received',
-            text: "To send 5 USDC privately to Bob via the ZK Privacy Pool, we need to deposit it into the pool first to shield it. This will generate a ZK Secret Note.\n\nReply with *Confirm* to execute this deposit.",
-            time: t
-          }]);
-          setBotStatus('online');
-          await sleep(2500);
-          if (!active) break;
-
-          // Step 2: User confirms deposit
-          setIsKeyboardActive(true);
-          await sleep(500);
-          if (!active) break;
-          await typeText("confirm", setPhoneInput, 130);
-          await sleep(400);
-          if (!active) break;
-          setPhoneMessages(prev => [...prev, { id: 4, type: 'sent', text: "confirm", time: t }]);
-          setPhoneInput('Message');
-          setIsKeyboardActive(false);
-          await sleep(600);
-          if (!active) break;
-
-          // Step 3: Deposit execution (ZK proof)
-          setPhoneMessages(prev => [...prev, {
-            id: 5,
-            type: 'received',
-            text: "⏳ *Generating ZK private deposit proof...*",
-            time: t
-          }]);
-          setBotStatus('typing...');
-          await sleep(3000);
-          if (!active) break;
-
-          setBotStatus('typing...');
-          setPhoneMessages(prev => [...prev, { id: 6, type: 'received', text: '...', time: '', typing: true }]);
-          await sleep(2000);
-          if (!active) break;
-
-          // Step 4: Deposit successful, returns note & asks for withdrawal confirmation to Bob
-          setPhoneMessages(prev => prev.filter(m => !m.typing));
-          setPhoneMessages(prev => [...prev, {
-            id: 7,
-            type: 'received',
-            text: "🛡️ *Successfully deposited 5.00 USDC into the Privacy Pool!* 🤫\n\nSave this ZK Secret Note:\n`stellapp-zk-v1_CBNWI5VVLB5ISMXKYS2HBARIJAVR35ACZMQM6TQMMTU3AGMVRV5ZC7QL_5_f839d20c91ab772f913d80_b4e578c187a2d3e120`\n\nNow, do you want to withdraw/send this note to Bob (Address: `GD2X...`) privately?\n\nReply with *Confirm* to execute this private transfer.",
-            time: t
-          }]);
-          setBotStatus('online');
-          await sleep(3500);
-          if (!active) break;
-
-          // Step 5: User confirms withdrawal to Bob
-          setIsKeyboardActive(true);
-          await sleep(500);
-          if (!active) break;
-          await typeText("confirm", setPhoneInput, 130);
-          await sleep(400);
-          if (!active) break;
-          setPhoneMessages(prev => [...prev, { id: 8, type: 'sent', text: "confirm", time: t }]);
-          setPhoneInput('Message');
-          setIsKeyboardActive(false);
-          await sleep(600);
-          if (!active) break;
-
-          // Step 6: Withdrawal execution (ZK proof)
-          setPhoneMessages(prev => [...prev, {
-            id: 9,
-            type: 'received',
-            text: "⏳ *Generating ZK proof for private withdrawal to Bob...*",
-            time: t
-          }]);
-          setBotStatus('typing...');
-          await sleep(3000);
-          if (!active) break;
-
-          setBotStatus('typing...');
-          setPhoneMessages(prev => [...prev, { id: 10, type: 'received', text: '...', time: '', typing: true }]);
-          await sleep(2000);
-          if (!active) break;
-
-          // Step 7: Withdrawal success message
-          setPhoneMessages(prev => prev.filter(m => !m.typing));
-          setPhoneMessages(prev => [...prev, {
-            id: 11,
-            type: 'received',
-            text: "✅ *Private Transfer Completed!* 📤\n\n5.00 USDC has been withdrawn from the ZK Privacy Pool directly into Bob's wallet. The link between your deposit and Bob's withdrawal is completely broken and untraceable on-chain.\n\n🔗 Explorer: https://stellar.expert/explorer/testnet/tx/f8a2e7d8...",
-            time: t
-          }]);
-          setBotStatus('online');
-
-        } else if (activeTab === 3) {
           // --- Scenario 3: ZK Confidential Transfer Payment (Deposit -> Merge -> Transfer) ---
           setIsKeyboardActive(true);
           await sleep(500);
@@ -868,8 +749,8 @@ export default function LandingPage() {
           }]);
           setBotStatus('online');
 
-        } else if (activeTab === 4) {
-          // --- Scenario 4: Automated Alerts & Background Jobs ---
+        } else if (activeTab === 3) {
+          // --- Scenario 3: Automated Alerts & Background Jobs ---
           setIsKeyboardActive(true);
           await sleep(500);
           if (!active) break;
@@ -1085,8 +966,8 @@ export default function LandingPage() {
                   
                   <ScrollStackItem itemClassName="bento-card full-width dark-card">
                       <div className="bento-content">
-                          <h3>ZK Privacy: Pools & Confidential Transfers</h3>
-                          <p>Protect your transactions with two advanced Zero-Knowledge systems. Use the ZK Privacy Pool to mix and shield tokens anonymously via secret notes, and ZK Confidential Transfers to encrypt and hide your account balances completely on-chain.</p>
+                          <h3>ZK Confidential Transfers</h3>
+                          <p>Protect your transactions with ZK Confidential Transfers. Harness homomorphic encryption to keep your transaction values and account balances completely hidden from public ledgers while verifying transfer solvency.</p>
                       </div>
                       <div className="bento-icon">
                           <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 12px rgba(129, 199, 132, 0.25))' }}>
@@ -1158,9 +1039,8 @@ export default function LandingPage() {
                   {[
                       { text: "Sending Tokens", num: "01" },
                       { text: "Deploy Contracts", num: "02" },
-                      { text: "ZK Privacy Pool", num: "03" },
-                      { text: "Confidential Transfer", num: "04" },
-                      { text: "Automated Alerts", num: "05" }
+                      { text: "Confidential Transfer", num: "03" },
+                      { text: "Automated Alerts", num: "04" }
                   ].map((tab, index) => (
                       <button
                           key={index}
@@ -1365,9 +1245,14 @@ export default function LandingPage() {
       </section>
 
       <section id="privacy-comparison" className="section privacy-comparison-section">
-          <h2 className="comparison-title">Ledger Visibility.</h2>
-          <p className="comparison-desc">Standard Stellar transactions are fully public — everyone can see sender, receiver, and amount. Stellar&apos;s network natively supports two levels of privacy. Stellapp gives you a simple WhatsApp interface to access them.</p>
+          <h2 className="comparison-title">On-Chain Confidentiality.</h2>
+          <p className="comparison-desc">Standard Stellar transactions are fully public, exposing wallet balances and transaction amounts to public trackers. StellApp solves this using ZK Confidential Transfers. By utilizing homomorphic encryption and zero-knowledge solvency proofs, your transfer amounts and account balances are completely hidden from public visibility while the network mathematically verifies solvency. Additionally, it supports selective auditability for compliance grants, allowing users to safely shield their financial activity while keeping access keys secure.</p>
           
+          <div className="confidential-usecases" style={{ textAlign: 'center', marginTop: '24px', marginBottom: '32px', fontSize: '16px', color: 'var(--text-secondary)' }}>
+              <span style={{ color: '#ffffff', fontWeight: 600, display: 'block', marginBottom: '8px', fontSize: '18px' }}>Where do Confidential Tokens actually get used?</span>
+              <p style={{ margin: 0, opacity: 0.85 }}>Payroll. Grants. Treasury. Bank settlement. B2B pricing. Anywhere counterparties are known but the amounts shouldn't be public.</p>
+          </div>
+
           <div className="comparison-container">
 
               {/* Card 1 — Standard Transfer */}
@@ -1405,39 +1290,6 @@ export default function LandingPage() {
                   </div>
               </div>
 
-              {/* Card 2 — ZK Privacy Pool */}
-              <div className="comparison-card private" style={{ borderColor: '#7c3aed44', background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(0,0,0,0) 100%)' }}>
-                  <h3 style={{ color: '#a78bfa' }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" style={{ marginRight: '8px' }}>
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                      </svg>
-                      ZK Privacy Pool
-                  </h3>
-                  <p className="intro">Deposit into a shared anonymity pool. Withdraw using a secret note — sender and receiver are completely unlinkable.</p>
-                  
-                  <div className="ledger-receipt">
-                      <div className="receipt-row">
-                          <span className="receipt-label">SENDER</span>
-                          <span className="receipt-val" style={{ color: '#a78bfa' }}>🔒 Pool Contract</span>
-                      </div>
-                      <div className="receipt-row">
-                          <span className="receipt-label">RECIPIENT</span>
-                          <span className="receipt-val" style={{ color: '#a78bfa' }}>🔒 Anonymous Note</span>
-                      </div>
-                      <div className="receipt-row">
-                          <span className="receipt-label">AMOUNT</span>
-                          <span className="receipt-val" style={{ color: '#a78bfa' }}>🔒 Hidden in Pool</span>
-                      </div>
-                      <div className="receipt-row">
-                          <span className="receipt-label">PROOF</span>
-                          <span className="receipt-val" style={{ color: '#a78bfa', fontSize: '10px' }}>zk-SNARK Verified ✓</span>
-                      </div>
-                      <div className="receipt-row">
-                          <span className="receipt-label">STATUS</span>
-                          <span className="status-badge private" style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa', border: '1px solid #7c3aed55' }}>🛡 UNTRACEABLE</span>
-                      </div>
-                  </div>
-              </div>
 
               {/* Card 3 — Confidential Transfer */}
               <div className="comparison-card private">
@@ -1527,24 +1379,13 @@ export default function LandingPage() {
               </div>
               <div className="faq-item">
                   <button className="faq-question" onClick={toggleFaq}>
-                      How do ZK Privacy Pools work on Stellapp?
+                      How do ZK Confidential Transfers work on Stellapp?
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="faq-icon">
                           <polyline points="6 9 12 15 18 9"></polyline>
                       </svg>
                   </button>
                   <div className="faq-answer">
-                      <p>ZK Privacy Pools shield your transaction history by breaking the on-chain link between the depositor and the withdrawer. When you deposit assets into the pool, you receive a secret proof of membership. Later, you can withdraw these assets to a clean, brand-new address by presenting a zero-knowledge proof. It is mathematically impossible for anyone to link the two addresses.</p>
-                  </div>
-              </div>
-              <div className="faq-item">
-                  <button className="faq-question" onClick={toggleFaq}>
-                      What is the difference between Privacy Pools and Confidential Transfers?
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="faq-icon">
-                          <polyline points="6 9 12 15 18 9"></polyline>
-                      </svg>
-                  </button>
-                  <div className="faq-answer">
-                      <p>Privacy Pools break the trace/link between the sender and recipient to make transactions untraceable. Confidential Transfers keep the sender-recipient link but fully encrypt the transaction amounts on-chain. Using zero-knowledge range proofs, the network verifies that you have enough funds to complete a transfer without ever revealing your actual balance or transfer size to the public ledger.</p>
+                      <p>ZK Confidential Transfers keep your transaction amounts and balances fully encrypted on-chain. Using zero-knowledge range proofs, the network verifies that you have enough funds to complete a transfer without ever revealing your actual balance or transfer size to the public ledger.</p>
                   </div>
               </div>
           </div>
@@ -1596,8 +1437,7 @@ export default function LandingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <h4 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Use Cases</h4>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '15px' }}>
-                      <li><a href="#features" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">ZK Privacy Pools</a></li>
-                      <li><a href="#features" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Shielded Transfers</a></li>
+                      <li><a href="#features" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Confidential Transfers</a></li>
                       <li><a href="#features" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} className="footer-link">Automated Billing</a></li>
                   </ul>
               </div>
