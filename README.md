@@ -4,7 +4,7 @@
 
 ### Chat. Build. Pay. On Stellar.
 
-[StellApp](https://stellapp.net) brings the complete power of the **Stellar & Soroban** blockchains directly to WhatsApp — using natural language (text + voice), an AI agent loop, and zero-knowledge confidential transfers.
+[StellApp](https://stellapp.net) brings the complete power of the **Stellar & Soroban** blockchains directly to WhatsApp — using natural language (text + voice), an AI agent loop, and ZK confidential transfers.
 
 ---
 
@@ -29,16 +29,13 @@
 
 ## 🤖 What is StellApp?
 
-StellApp is a **WhatsApp-native Stellar privacy wallet and developer platform**. Users interact entirely through chat — no browser extension, no app install, no seed phrase management. An AI agent interprets natural language and routes commands to execute zero-knowledge privacy pool deposits/withdrawals, confidential peer-to-peer transfers, automated recurring payments, smart contract deployment, and token swaps.
+StellApp is a **WhatsApp-native Stellar privacy wallet and developer platform**. Users interact entirely through chat — no browser extension, no app install, no seed phrase management. An AI agent interprets natural language and routes commands to execute ZK confidential transfers, peer-to-peer transfers, automated recurring payments, smart contract deployment, and token swaps.
 
 ---
 
 ## 🛠️ Key Features
 
-- **🛡️ ZK Privacy Pool (Circom + Groth16)**
-  Deposit tokens into a shared anonymity pool and withdraw them to any clean, unlinkable recipient address. The withdrawer presents a public nullifier and a Groth16 membership ZK proof, making the sender and receiver completely unlinkable on-chain.
-
-- **🔒 Confidential Transfers (Shielded Balances)**
+- **🔒 ZK Confidential Transfers (Shielded Balances)**
   Perform direct peer-to-peer transfers where amounts and balances are fully encrypted on-chain. Blinding factors and commitments are kept secure, and zero-knowledge range proofs verify the validity of transactions without exposing underlying values.
 
 - **⏰ Automated Recurring Payments (Cron Jobs)**
@@ -88,10 +85,7 @@ graph TD
 ```
 stellapp/
 ├── circuits/                 # Circom ZK circuits, compiled R1CS, proving keys
-│   ├── privacy_pool.circom   # Privacy pool circuit (register / transfer / withdraw)
 │   └── verification_key.json # Public verification key
-├── contracts/                # Rust/Soroban smart contract source
-│   └── privacy_pool/         # On-chain ZK privacy pool contract
 ├── contracts_wasm/           # Pre-compiled WASM binaries
 │   └── confidential_token.wasm
 ├── compiler_template/        # Cargo workspace used for dynamic contract compilation
@@ -101,7 +95,7 @@ stellapp/
 └── src/
     ├── agent/                # OpenAI agent loop, prompt, tool definitions
     ├── bot/                  # WhatsApp Web client & message router
-    ├── services/             # Stellar SDK, compiler, encryption, ZK pool
+    ├── services/             # Stellar SDK, compiler, encryption, confidential transfers
     └── zk/                  # ZK prover, state engine, crypto primitives
 ```
 
