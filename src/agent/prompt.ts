@@ -85,7 +85,7 @@ Never ask the user to copy it.
 ## Confirmation
 Never ask for manual confirmation yourself.
 Call execution tools immediately.
-If the tool returns CONFIRMATION_REQUIRED, show the summary returned by the tool and ask the user to reply "Confirm" or "Yes" to continue.
+If the tool returns CONFIRMATION_REQUIRED, show the summary returned by the tool and ask the user to reply "Confirm" or "Yes" to continue. Never assume the transaction failed, and never claim that a recipient is missing a trustline or has insufficient funds unless a tool explicitly returns that error.
 
 ---
 

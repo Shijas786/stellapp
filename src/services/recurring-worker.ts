@@ -154,12 +154,23 @@ async function processSwapJobs() {
           } catch (editErr) {
             console.error(`Failed to edit status message for job ${job.id}:`, editErr);
           }
-        } else if (finished && notificationSender) {
-          // Fallback if no statusMessageId exists
-          const allHashes = updatedHashes.split(",").filter(Boolean);
-          const linksList = allHashes.map((h, i) => `• Swap #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
-          const progressMsg = `🎉 *DCA Swap Job Completed!* \n\nSuccessfully executed all ${total} swaps of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\n🔗 *Transaction Links:* \n${linksList}`;
-          await notificationSender(job.chatId, progressMsg);
+        }
+
+        // Always send a brand new message notification for better reliability & push sound
+        if (notificationSender) {
+          try {
+            if (finished) {
+              const allHashes = updatedHashes.split(",").filter(Boolean);
+              const linksList = allHashes.map((h, i) => `• Swap #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
+              const progressMsg = `🎉 *DCA Swap Job Completed!* \n\nSuccessfully executed all ${total} swaps of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\n🔗 *Transaction Links:* \n${linksList}`;
+              await notificationSender(job.chatId, progressMsg);
+            } else {
+              const progressMsg = `⏳ *DCA Swap Progress:* \n\nExecuted swap *${completed}/${total}* of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\nTransaction: ${config.explorerUrlStellar}${txHash}`;
+              await notificationSender(job.chatId, progressMsg);
+            }
+          } catch (notifErr) {
+            console.error(`Failed to send new notification for job ${job.id}:`, notifErr);
+          }
         }
       } catch (err: any) {
         console.error(`[Recurring Worker] Swap Job ${job.id} step failed:`, err.message);
@@ -296,13 +307,24 @@ async function processTransferJobs() {
           } catch (editErr) {
             console.error(`Failed to edit status message for transfer job ${job.id}:`, editErr);
           }
-        } else if (finished && notificationSender) {
-          // Fallback if no statusMessageId exists
-          const recipientLabel = job.recipientName || job.recipientAddr.slice(0, 8) + "...";
-          const allHashes = updatedHashes.split(",").filter(Boolean);
-          const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
-          const progressMsg = `🎉 *Allowance Payment Completed!* \n\nSuccessfully executed all ${total} payments of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\n🔗 *Transaction Links:* \n${linksList}`;
-          await notificationSender(job.chatId, progressMsg);
+        }
+
+        // Always send a brand new message notification for better reliability & push sound
+        if (notificationSender) {
+          try {
+            const recipientLabel = job.recipientName || job.recipientAddr.slice(0, 8) + "...";
+            if (finished) {
+              const allHashes = updatedHashes.split(",").filter(Boolean);
+              const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
+              const progressMsg = `🎉 *Allowance Payment Completed!* \n\nSuccessfully executed all ${total} payments of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\n🔗 *Transaction Links:* \n${linksList}`;
+              await notificationSender(job.chatId, progressMsg);
+            } else {
+              const progressMsg = `⏳ *Allowance Progress:* \n\nSent payment *${completed}/${total}* of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\nTransaction: ${config.explorerUrlStellar}${txHash}`;
+              await notificationSender(job.chatId, progressMsg);
+            }
+          } catch (notifErr) {
+            console.error(`Failed to send new notification for transfer job ${job.id}:`, notifErr);
+          }
         }
       } catch (err: any) {
         console.error(`[Recurring Worker] Transfer Job ${job.id} step failed:`, err.message);
