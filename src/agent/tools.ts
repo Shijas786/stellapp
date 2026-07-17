@@ -1697,18 +1697,19 @@ ${rustCode}
     case "confidential_register_all": {
       const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
 
-      // 1. Detect which assets the user actually holds (non-zero balance)
+      // 1. Ensure the wallet has enough XLM to pay transaction fees and reserve limits
       const balances = await stellar.getBalances(user.stellarPublic);
-      const assetsToRegister: string[] = [];
-      if (parseFloat(balances.xlm) > 0) assetsToRegister.push("XLM");
-      if (parseFloat(balances.usdc) > 0) assetsToRegister.push("USDC");
+      const xlmBalance = parseFloat(balances.xlm) || 0;
 
-      if (assetsToRegister.length === 0) {
+      if (xlmBalance < 0.5) {
         return {
           success: false,
-          message: `⚠️ No non-zero balances found. Fund your wallet with XLM or USDC before registering for confidential transfers.`
+          message: `⚠️ Your wallet must have at least 0.5 XLM to cover network transaction fees before registering for ZK confidential transfers.`
         };
       }
+
+      // Register both supported assets (XLM and USDC)
+      const assetsToRegister = ["XLM", "USDC"];
 
       await sendNotification(chatId, `⏳ *Registering ${assetsToRegister.join(" & ")} for ZK confidential transfers...*\n\nThis generates a ZK proof per asset and submits sequentially. Takes ~15-20s per asset.`);
 
