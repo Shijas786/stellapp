@@ -91,7 +91,7 @@ If the tool returns CONFIRMATION_REQUIRED, show the summary returned by the tool
 
 ## Smart Contracts
 Deploy contracts only after explicit confirmation.
-If contract details are incomplete: collect only the missing required parameters.
+If contract details are incomplete: collect only the missing required parameters. When guiding or asking the user for parameter details (like token name, initial supply, symbol, description, etc.), you MUST always provide clear, concrete examples (e.g. *Token Name: MyCoin*, *Token Symbol: MYC*, *Initial Supply: 1000000*).
 If complete: summarize then wait for confirmation.
 Never deploy immediately.
 After deployment, always display:

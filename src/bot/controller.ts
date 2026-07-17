@@ -279,7 +279,7 @@ export async function handleIncomingMessage(
     // ── Route directly to AI agent loop for a unified AI experience ──────────
     try {
       // 1. Smart contract deployment/compilation requires the premium model (gpt-5.6-luna).
-      const isContractIntent = /deploy|contract|compile|code|rust|soroban|wasm|builder|smart contract/i.test(text);
+      const isContractIntent = /deploy|contract|compile|code|rust|soroban|wasm|builder|smart contract|token|mint|issue|asset|coin/i.test(text);
 
       // 2. Financial/money-moving operations also require the premium model for accurate name/address/amount resolution.
       const isFinancialIntent = /\b(send|pay|transfer|swap|exchange|trade|dca|recurring|allowance|merge|withdraw|deposit|confirm|yes|schedule|scheduled|schedules|job|jobs)\b/i.test(text);
