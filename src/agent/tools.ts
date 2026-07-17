@@ -1092,9 +1092,9 @@ export async function executeTool(
       const pending = await getPendingAction(chatId);
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "send_stellar" &&
-        pending.args.resolvedAddr === recipient &&
-        pending.args.amount === args.amount &&
-        pending.args.asset === args.asset;
+        String(pending.args.resolvedAddr) === String(recipient) &&
+        String(pending.args.amount) === String(args.amount) &&
+        String(pending.args.asset) === String(args.asset);
 
       const canExecute = isConfirmed && pending && pending.name === "send_stellar" && argsMatch;
 
@@ -1196,8 +1196,8 @@ export async function executeTool(
       const swapConfirmed = await isLatestMessageConfirmation(chatId);
       const swapArgsMatch = swapPending &&
         swapPending.name === "swap_stellar" &&
-        swapPending.args.amount === args.amount &&
-        swapPending.args.direction === args.direction;
+        String(swapPending.args.amount) === String(args.amount) &&
+        String(swapPending.args.direction) === String(args.direction);
 
       const canExecute = swapConfirmed && swapPending && swapPending.name === "swap_stellar" && swapArgsMatch;
 
@@ -1234,10 +1234,10 @@ export async function executeTool(
       const confirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending &&
         pending.name === "schedule_recurring_swap" &&
-        pending.args.amountPerSwap === args.amountPerSwap &&
-        pending.args.fromAsset === args.fromAsset &&
-        pending.args.toAsset === args.toAsset &&
-        pending.args.totalSwaps === args.totalSwaps;
+        String(pending.args.amountPerSwap) === String(args.amountPerSwap) &&
+        String(pending.args.fromAsset) === String(args.fromAsset) &&
+        String(pending.args.toAsset) === String(args.toAsset) &&
+        String(pending.args.totalSwaps) === String(args.totalSwaps);
 
       const canExecute = confirmed && pending && pending.name === "schedule_recurring_swap" && argsMatch;
 
@@ -1372,10 +1372,10 @@ export async function executeTool(
       const confirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending &&
         pending.name === "schedule_recurring_transfer" &&
-        pending.args.recipient === args.recipient &&
-        pending.args.amountPerTransfer === args.amountPerTransfer &&
-        pending.args.assetCode === args.assetCode &&
-        pending.args.totalTransfers === args.totalTransfers;
+        String(pending.args.recipient) === String(args.recipient) &&
+        String(pending.args.amountPerTransfer) === String(args.amountPerTransfer) &&
+        String(pending.args.assetCode) === String(args.assetCode) &&
+        String(pending.args.totalTransfers) === String(args.totalTransfers);
 
       const canExecute = confirmed && pending && pending.name === "schedule_recurring_transfer" && argsMatch;
 
@@ -1450,8 +1450,8 @@ export async function executeTool(
       const pending = await getPendingAction(chatId);
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "deploy_custom_contract" &&
-        pending.args.contractType === args.contractType &&
-        (args.contractType !== "custom" || pending.args.customDescription === args.customDescription);
+        String(pending.args.contractType) === String(args.contractType) &&
+        (args.contractType !== "custom" || String(pending.args.customDescription) === String(args.customDescription));
 
       const canExecute = isConfirmed && pending && pending.name === "deploy_custom_contract" && argsMatch;
 
@@ -1903,9 +1903,9 @@ ${rustCode}
       const pending = await getPendingAction(chatId);
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "confidential_transfer" &&
-        pending.args.resolvedAddr === recipient &&
-        pending.args.amount === args.amount &&
-        pending.args.asset === assetCode;
+        String(pending.args.resolvedAddr) === String(recipient) &&
+        String(pending.args.amount) === String(args.amount) &&
+        String(pending.args.asset) === String(assetCode);
 
       const canExecute = isConfirmed && pending && pending.name === "confidential_transfer" && argsMatch;
 
@@ -1961,9 +1961,9 @@ ${rustCode}
       const pending = await getPendingAction(chatId);
       const isConfirmed = await isLatestMessageConfirmation(chatId);
       const argsMatch = pending && pending.name === "confidential_withdraw" &&
-        pending.args.recipient === recipient &&
-        pending.args.amount === args.amount &&
-        pending.args.asset === assetCode;
+        String(pending.args.recipient) === String(recipient) &&
+        String(pending.args.amount) === String(args.amount) &&
+        String(pending.args.asset) === String(assetCode);
 
       const canExecute = isConfirmed && pending && pending.name === "confidential_withdraw" && argsMatch;
 
