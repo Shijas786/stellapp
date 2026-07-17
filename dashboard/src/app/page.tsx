@@ -1246,12 +1246,7 @@ export default function LandingPage() {
 
       <section id="privacy-comparison" className="section privacy-comparison-section">
           <h2 className="comparison-title">On-Chain Confidentiality.</h2>
-          <p className="comparison-desc">Standard Stellar transactions are fully public, exposing wallet balances and transaction amounts to public trackers. StellApp solves this using ZK Confidential Transfers. By utilizing homomorphic encryption and zero-knowledge solvency proofs, your transfer amounts and account balances are completely hidden from public visibility while the network mathematically verifies solvency. Additionally, it supports selective auditability for compliance grants, allowing users to safely shield their financial activity while keeping access keys secure.</p>
-          
-          <div className="confidential-usecases" style={{ textAlign: 'center', marginTop: '24px', marginBottom: '32px', fontSize: '16px', color: 'var(--text-secondary)' }}>
-              <span style={{ color: '#ffffff', fontWeight: 600, display: 'block', marginBottom: '8px', fontSize: '18px' }}>Where do Confidential Tokens actually get used?</span>
-              <p style={{ margin: 0, opacity: 0.85 }}>Payroll. Grants. Treasury. Bank settlement. B2B pricing. Anywhere counterparties are known but the amounts shouldn't be public.</p>
-          </div>
+          <p className="comparison-desc">Standard Stellar transactions are fully public, exposing wallet balances and transaction amounts to public trackers. StellApp solves this using ZK Confidential Transfers. By utilizing homomorphic encryption and zero-knowledge solvency proofs, your transfer amounts and account balances are completely hidden from public trackers while the network mathematically verifies solvency. This is essential for payroll, grants, treasury management, bank settlement, and B2B pricing—anywhere counterparties are known but the transaction amounts must remain private.</p>
 
           <div className="comparison-container">
 
