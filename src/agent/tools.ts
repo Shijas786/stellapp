@@ -25,8 +25,8 @@ async function getPendingAction(chatId: string): Promise<any | null> {
       const state = JSON.parse(record.stateJson);
       if (state._pending_action) {
         const pending = JSON.parse(state._pending_action);
-        // Expire after 5 minutes
-        if (Date.now() - pending.createdAt < 5 * 60 * 1000) {
+        // Expire after 30 minutes
+        if (Date.now() - pending.createdAt < 30 * 60 * 1000) {
           return pending;
         }
       }
