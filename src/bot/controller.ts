@@ -277,10 +277,14 @@ export async function handleIncomingMessage(
 
     // ── Route directly to AI agent loop for a unified AI experience ──────────
     try {
-      // Contract deployment, compilation, and Rust code generation requires the premium model (gpt-5.6-luna).
-      // Other standard interactions (swapping, sending, checking balance) run on the cheaper mini model (gpt-4o-mini).
+      // 1. Smart contract deployment/compilation requires the premium model (gpt-5.6-luna).
       const isContractIntent = /deploy|contract|compile|code|rust|soroban|wasm|builder|smart contract/i.test(text);
+
+      // 2. Financial/money-moving operations also require the premium model for accurate name/address/amount resolution.
+      const isFinancialIntent = /\b(send|pay|transfer|swap|exchange|trade|dca|recurring|allowance|merge|withdraw|deposit|confirm|yes)\b/i.test(text);
+
       let isContractWorkflow = false;
+      let isFinancialWorkflow = false;
       try {
         const sessionRecord = await prisma.sessionState.findUnique({ where: { chatId } });
         if (sessionRecord) {
@@ -295,12 +299,26 @@ export async function handleIncomingMessage(
           ) {
             isContractWorkflow = true;
           }
+          if (state._pending_action) {
+            const pending = JSON.parse(state._pending_action);
+            const financialActions = [
+              "send_stellar",
+              "swap_tokens",
+              "schedule_recurring_swap",
+              "setup_recurring_transfer",
+              "confidential_transfer",
+              "confidential_merge"
+            ];
+            if (financialActions.includes(pending.name)) {
+              isFinancialWorkflow = true;
+            }
+          }
         }
       } catch (err) {
         console.error("[Controller] Failed to parse session workflow state:", err);
       }
 
-      const forceExpensive = isContractIntent || isContractWorkflow;
+      const forceExpensive = isContractIntent || isContractWorkflow || isFinancialIntent || isFinancialWorkflow;
 
       const aiResponse = await runAgentLoop(chatId, text, {
         id: user.id,

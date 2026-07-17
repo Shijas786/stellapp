@@ -156,7 +156,8 @@ async function processSwapJobs() {
           }
         }
 
-        // Always send a brand new message notification for better reliability & push sound
+        // Only send a brand new message notification on completion (so user gets a push alert),
+        // or as a fallback if no status message exists to edit.
         if (notificationSender) {
           try {
             if (finished) {
@@ -164,7 +165,7 @@ async function processSwapJobs() {
               const linksList = allHashes.map((h, i) => `• Swap #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
               const progressMsg = `🎉 *DCA Swap Job Completed!* \n\nSuccessfully executed all ${total} swaps of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\n🔗 *Transaction Links:* \n${linksList}`;
               await notificationSender(job.chatId, progressMsg);
-            } else {
+            } else if (!job.statusMessageId || !messageEditor) {
               const progressMsg = `⏳ *DCA Swap Progress:* \n\nExecuted swap *${completed}/${total}* of ${job.amountPerSwap} ${job.fromAsset} → ${job.toAsset}.\n\nTransaction: ${config.explorerUrlStellar}${txHash}`;
               await notificationSender(job.chatId, progressMsg);
             }
@@ -309,7 +310,8 @@ async function processTransferJobs() {
           }
         }
 
-        // Always send a brand new message notification for better reliability & push sound
+        // Only send a brand new message notification on completion (so user gets a push alert),
+        // or as a fallback if no status message exists to edit.
         if (notificationSender) {
           try {
             const recipientLabel = job.recipientName || job.recipientAddr.slice(0, 8) + "...";
@@ -318,7 +320,7 @@ async function processTransferJobs() {
               const linksList = allHashes.map((h, i) => `• Transfer #${i+1}: ${config.explorerUrlStellar}${h}`).join("\n");
               const progressMsg = `🎉 *Allowance Payment Completed!* \n\nSuccessfully executed all ${total} payments of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\n🔗 *Transaction Links:* \n${linksList}`;
               await notificationSender(job.chatId, progressMsg);
-            } else {
+            } else if (!job.statusMessageId || !messageEditor) {
               const progressMsg = `⏳ *Allowance Progress:* \n\nSent payment *${completed}/${total}* of ${job.amountPerTransfer} ${job.assetCode} to ${recipientLabel}.\n\nTransaction: ${config.explorerUrlStellar}${txHash}`;
               await notificationSender(job.chatId, progressMsg);
             }

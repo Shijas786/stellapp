@@ -112,39 +112,61 @@ async function isLatestMessageConfirmation(chatId: string): Promise<boolean> {
       if (userMessages.length > 0) {
         // Check if the latest user message confirmation was already consumed/processed
         const sessionRecord = await prisma.sessionState.findUnique({ where: { chatId } });
+        let isHighRiskAction = false;
         if (sessionRecord) {
           const state = JSON.parse(sessionRecord.stateJson);
           if (state.lastConsumedUserMsgCount === userMessages.length) {
             return false;
           }
+          if (state._pending_action) {
+            try {
+              const pending = JSON.parse(state._pending_action);
+              if (["send_stellar", "confidential_transfer", "export_wallet"].includes(pending.name)) {
+                isHighRiskAction = true;
+              }
+            } catch {}
+          }
         }
 
         const lastMsg = userMessages[userMessages.length - 1].content.toLowerCase().trim();
 
-        // 1. Exact whole-message match for short/loose terms (preventing substring/word fragment matching)
-        const exactMatchTerms = [
-          "y", "ok", "okay", "yes", "confirm", "confrim", "confrm", 
-          "yep", "yeah", "yea", "agree", "sure", "do it", "go ahead", 
-          "proceed", "approve", "doit", "goahead"
-        ];
-        if (exactMatchTerms.includes(lastMsg)) return true;
+        if (isHighRiskAction) {
+          // Strict confirmation terms for high-risk actions (send, confidential transfer, export wallet)
+          const strictMatchTerms = ["yes", "confirm", "confrim", "confrm", "proceed", "approve"];
+          if (strictMatchTerms.includes(lastMsg)) return true;
 
-        // 2. Whole-word match for strong confirmation terms (excluding "y", "ok", "send")
-        const strongTerms = [
-          "yes", "confirm", "confrim", "confrm", "approve", 
-          "yep", "yeah", "yea", "agree", "sure", "proceed"
-        ];
-        // Tokenize by word-boundaries/whitespace/punctuation
-        const words = lastMsg.split(/[\s,.\?!_#\-]+/);
-        const hasStrongWord = strongTerms.some(term => words.includes(term));
-        if (hasStrongWord) return true;
+          const words = lastMsg.split(/[\s,.\?!_#\-]+/);
+          const hasStrictWord = strictMatchTerms.some(term => words.includes(term));
+          if (hasStrictWord) return true;
 
-        // 3. Robust Levenshtein distance check on any word to capture complex confirmation typos
-        const isFuzzyConfirm = words.some((w: string) => {
-          if (w.length >= 4 && getLevenshteinDistance(w, "confirm") <= 1) return true;
-          return false;
-        });
-        return isFuzzyConfirm;
+          const isFuzzyConfirm = words.some((w: string) => {
+            if (w.length >= 4 && getLevenshteinDistance(w, "confirm") <= 1) return true;
+            return false;
+          });
+          return isFuzzyConfirm;
+        } else {
+          // Standard loose terms for lower-risk actions (DCA, alarms, etc.)
+          const exactMatchTerms = [
+            "y", "ok", "okay", "yes", "confirm", "confrim", "confrm", 
+            "yep", "yeah", "yea", "agree", "sure", "do it", "go ahead", 
+            "proceed", "approve", "doit", "goahead"
+          ];
+          if (exactMatchTerms.includes(lastMsg)) return true;
+
+          const strongTerms = [
+            "yes", "confirm", "confrim", "confrm", "approve", 
+            "yep", "yeah", "yea", "agree", "sure", "proceed"
+          ];
+          const words = lastMsg.split(/[\s,.\?!_#\-]+/);
+          const hasStrongWord = strongTerms.some(term => words.includes(term));
+          if (hasStrongWord) return true;
+
+          const isFuzzyConfirm = words.some((w: string) => {
+            if (w.length >= 4 && getLevenshteinDistance(w, "confirm") <= 1) return true;
+            return false;
+          });
+          return isFuzzyConfirm;
+        }
       }
     }
   } catch {}
