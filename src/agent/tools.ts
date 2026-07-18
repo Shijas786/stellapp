@@ -1466,6 +1466,10 @@ export async function executeTool(
       // Clear pending action upon approval
       await clearPendingAction(chatId);
 
+      const stellarExpertTxUrl = config.isMainnet 
+        ? "https://stellar.expert/explorer/public/tx/" 
+        : "https://stellar.expert/explorer/testnet/tx/";
+
       const statusMsgId = await sendNotification(chatId, "⏳ *[1/3] Generating Rust contract...*\n\nGenerating your custom Soroban Rust contract code using the Responses API + Stellar Vector Store. Please wait!");
       const stellarSecret = decryptForUserWithMigration(user.stellarSecret, user.id).plaintext;
       const contractType: string = (args.contractType || "custom").toLowerCase();
@@ -1657,8 +1661,8 @@ This document contains the compilation logs, configuration, and interface specs 
 - **Network**: Stellar ${config.isMainnet ? "Mainnet" : "Testnet"}
 
 ### 🔗 Blockchain Explorers
-- **Upload Transaction**: [Stellar Expert](${config.explorerUrlStellar}${uploadTxHash})
-- **Instantiation Transaction**: [Stellar Expert](${config.explorerUrlStellar}${instantiateTxHash})
+- **Upload Transaction**: [Stellar Expert](${stellarExpertTxUrl}${uploadTxHash})
+- **Instantiation Transaction**: [Stellar Expert](${stellarExpertTxUrl}${instantiateTxHash})
 - **Contract Explorer**: [Stellar Expert](${config.explorerUrlStellarContract}${contractId})
 
 ### 🛠️ How to Interact On-Chain (CLI / SDK)
@@ -1703,7 +1707,7 @@ ${rustCode}
         wasmHash,
         uploadTxHash,
         instantiateTxHash,
-        explorerUrl: `${config.explorerUrlStellar}${instantiateTxHash}`,
+        explorerUrl: `${stellarExpertTxUrl}${instantiateTxHash}`,
         contractExplorerUrl: `${config.explorerUrlStellarContract}${contractId}`,
         rustCode: rustCode,
         docUrl: docUrl

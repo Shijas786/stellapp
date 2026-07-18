@@ -57,8 +57,8 @@ export const config = {
     
   get explorerUrlStellarContract(): string {
     return this.isMainnet
-      ? "https://stellarchain.io/address/"
-      : "https://testnet.stellarchain.io/address/";
+      ? "https://stellar.expert/explorer/public/contract/"
+      : "https://stellar.expert/explorer/testnet/contract/";
   },
 
   // Mainnet/Testnet ZK contract mappings
