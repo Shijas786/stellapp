@@ -143,7 +143,7 @@ export async function handleIncomingMessage(
             `Everything happens through a simple chat.\n\n` +
             `To get started, reply with:\n` +
             `👉 *create wallet* to get started!`,
-          imagePath: path.join(process.cwd(), 'public', 'assets', 'onboarding.png')
+          imagePath: path.join(process.cwd(), 'public', 'assets', 'onboarding.jpg')
         };
       }
 
