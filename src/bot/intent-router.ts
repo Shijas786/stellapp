@@ -40,7 +40,7 @@ const HISTORY_PATTERNS = [
 ];
 
 const HELP_PATTERNS = [
-  /^(help|\/help|hi|hello|hey|start|what can you do|commands?|menu|options?)\.?$/i,
+  /^(help|\/help|hi+|hy+|hello|helo|hlo|hey+|yo|sup|start|gm|ge|good morning|good evening|what can you do|commands?|menu|options?)\.?$/i,
   /\b(what (can|do) (you|this bot) (do|help|support))\b/i,
   /\b(features?|capabilities|how (does|do) (this|you) work)\b/i,
 ];
