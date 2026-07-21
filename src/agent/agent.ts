@@ -27,11 +27,22 @@ function sanitizeHistory(history: OpenAI.Chat.ChatCompletionMessageParam[]): Ope
   const systemPrompt = history[0];
   const rest = history.slice(1);
 
+  // Filter out any hallucinated assistant messages regarding uploaded files/documents
+  const filteredRest = rest.filter((msg: any) => {
+    if (msg.role === "assistant" && typeof msg.content === "string") {
+      const lower = msg.content.toLowerCase();
+      if (lower.includes("uploaded some files") || lower.includes("uploaded some documents") || lower.includes("uploaded documents") || lower.includes("uploaded files")) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   const sanitized: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   const activeToolCallIds = new Set<string>();
 
   // 1. Keep tool responses only if their originating assistant message was not pruned
-  for (const msg of rest) {
+  for (const msg of filteredRest) {
     if (msg.role === "tool") {
       if (msg.tool_call_id && activeToolCallIds.has(msg.tool_call_id)) {
         sanitized.push(msg);
@@ -421,11 +432,12 @@ function sanitizeAssistantResponse(text: string): string {
 
 async function callResponsesApi(
   modelToUse: string,
-  messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[]
+  messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[],
+  enableVectorStore: boolean = false
 ): Promise<OpenAI.Chat.ChatCompletionMessageParam> {
   const input = mapHistoryToResponsesInput(messagesForOpenAI);
   const toolsParam: any[] = [];
-  if (config.openaiVectorStoreId) {
+  if (config.openaiVectorStoreId && enableVectorStore) {
     toolsParam.push({
       type: "file_search",
       vector_store_ids: [config.openaiVectorStoreId]
@@ -535,13 +547,17 @@ export async function runAgentLoop(
       await saveActiveSkills(chatId, []);
     }
 
+    const requiresTechnicalSearch = 
+      activeSkills.length > 0 ||
+      /\b(contract|soroban|wasm|zk|proof|openzeppelin|rust|doc|docs|documentation|reference|codebase|audit|how to|build|deploy)\b/i.test(userMessage);
+
     const messagesForOpenAI: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: dynamicSystemContent },
       ...history.slice(1)
     ];
 
     // 4. Request completion from OpenAI Responses API
-    let assistantMessage: any = await callResponsesApi(modelToUse, messagesForOpenAI);
+    let assistantMessage: any = await callResponsesApi(modelToUse, messagesForOpenAI, requiresTechnicalSearch);
     history.push(assistantMessage);
     await saveHistory(chatId, history);
 
@@ -610,7 +626,7 @@ export async function runAgentLoop(
         ...history.slice(1)
       ];
 
-      assistantMessage = await callResponsesApi(modelToUse, updatedMessagesForOpenAI);
+      assistantMessage = await callResponsesApi(modelToUse, updatedMessagesForOpenAI, requiresTechnicalSearch);
       history.push(assistantMessage);
       await saveHistory(chatId, history);
     }

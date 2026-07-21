@@ -804,10 +804,9 @@ export class WhatsAppBot {
         }
 
         try {
-          fs.cpSync(tempSession, volumeSession, { recursive: true, force: true });
+          fs.cpSync(tempSession, volumeSession, { recursive: true, force: true, dereference: false });
         } catch (cpErr: any) {
           console.warn("[WhatsApp Sync] Native backup cpSync failed, error details:", cpErr.message);
-          throw cpErr;
         }
         console.log("[WhatsApp Sync] Session backup completed successfully.");
       }
