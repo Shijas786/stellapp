@@ -79,12 +79,19 @@ export function decryptForUser(encryptedData: string, userId: string): string {
  */
 export function decryptForUserWithMigration(
   encryptedData: string,
-  userId: string
+  userId: string,
+  fallbackChatId?: string
 ): { plaintext: string; migrated: boolean } {
   try {
     const plaintext = decryptForUser(encryptedData, userId);
     return { plaintext, migrated: false };
   } catch {
+    if (fallbackChatId) {
+      try {
+        const plaintext = decryptForUser(encryptedData, fallbackChatId);
+        return { plaintext, migrated: true };
+      } catch {}
+    }
     // Fall back to legacy global key (pre-HKDF rows)
     const plaintext = decrypt(encryptedData);
     return { plaintext, migrated: true };

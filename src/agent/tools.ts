@@ -23,6 +23,28 @@ export const GATED_FINANCIAL_ACTIONS = [
 ] as const;
 
 
+export function formatHumanError(error: any): string {
+  const msg = (typeof error === "string" ? error : error?.message || JSON.stringify(error)).toLowerCase();
+
+  if (msg.includes("op_no_trust") || msg.includes("trustlinemissing")) {
+    return "Error: The recipient has not enabled USDC yet (missing trustline). Action required: Ask the recipient to message the bot or send 'activate' to enable USDC.";
+  }
+  if (msg.includes("op_no_destination") || msg.includes("account_not_found")) {
+    return "Error: The recipient Stellar address is not activated on-chain. Action required: Send them at least 1 XLM first to activate their wallet.";
+  }
+  if (msg.includes("op_underfunded") || msg.includes("insufficient balance") || msg.includes("underfunded")) {
+    return "Error: Insufficient balance. Stellar accounts require a minimum reserve of 1 XLM base + 0.5 XLM per trustline. Action required: Suggest checking 'balance' or funding testnet XLM ('fund me').";
+  }
+  if (msg.includes("tx_bad_seq") || msg.includes("bad sequence")) {
+    return "Error: Network sequence number was temporarily out of sync. Action required: Please retry the transaction in a moment.";
+  }
+  if (msg.includes("tx_bad_auth") || msg.includes("bad_auth")) {
+    return "Error: Transaction signature authentication failed. Action required: Please verify account key permissions or try again.";
+  }
+
+  return typeof error === "string" ? error : error?.message || "Operation failed.";
+}
+
 // ============================================================
 // AI AGENT CONFIRMATION GATE HELPERS
 // ============================================================
@@ -173,6 +195,13 @@ async function isLatestMessageConfirmation(chatId: string): Promise<boolean> {
             if (w.length >= 4 && getLevenshteinDistance(w, "confirm") <= 1) return true;
             return false;
           });
+
+          if (!isFuzzyConfirm) {
+            // Auto-clear stale pending action if user asks a question, cancels, or changes topic
+            if (lastMsg.endsWith("?") || /^(no|cancel|stop|don'?t|abort|nevermind|what|how|why|show|check|list|help)\b/i.test(lastMsg)) {
+              clearPendingAction(chatId).catch(() => {});
+            }
+          }
           return isFuzzyConfirm;
         }
       }

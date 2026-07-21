@@ -233,7 +233,7 @@ export async function handleIncomingMessage(
         if (funded) {
           try {
             console.log(`[Controller] Establishing USDC trustline on Testnet for: ${user.stellarPublic}`);
-            const { plaintext: secret, migrated } = decryptForUserWithMigration(user.stellarSecret, user.id);
+            const { plaintext: secret, migrated } = decryptForUserWithMigration(user.stellarSecret, user.id, user.chatId);
             if (migrated) {
               // Transparently re-encrypt with per-user key and persist
               await prisma.user.update({ where: { id: user.id }, data: { stellarSecret: encryptForUser(secret, user.id) } });

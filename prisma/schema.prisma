@@ -79,6 +79,9 @@ model RecurringSwapJob {
   txHashes        String   @default("")
   statusMessageId String?
   createdAt       DateTime @default(now())
+
+  @@index([isActive])
+  @@index([chatId])
 }
 
 // Background recurring transfer jobs (Allowance / Rent)
@@ -97,6 +100,9 @@ model RecurringTransferJob {
   txHashes         String   @default("")
   statusMessageId  String?
   createdAt        DateTime @default(now())
+
+  @@index([isActive])
+  @@index([chatId])
 }
 
 // Background limit orders (Price-triggered swaps)
@@ -111,6 +117,9 @@ model LimitOrderJob {
   isActive        Boolean  @default(true)
   txHash          String?
   createdAt       DateTime @default(now())
+
+  @@index([isActive])
+  @@index([chatId])
 }
 
 model AlertJob {
@@ -121,6 +130,9 @@ model AlertJob {
   message          String
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
+
+  @@index([isActive])
+  @@index([chatId])
 }
 
 
